@@ -6,13 +6,13 @@
 
 ## Use case 
 
-![](images/analytics/use-case.png)
+![](../images/use-case.png)
 
 
 ## Макет агента
 
-![](images/Макет%20Al-Шеф_v2.png)
+![](../images/Макет%20Al-Шеф_v2.png)
 
 ## BPMN диаграмма
 
-![](images/BPMN%20диаграмма%20агента_v2.png)
+![](../images/BPMN%20диаграмма%20агента_v2.png)
