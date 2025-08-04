@@ -8,6 +8,7 @@
 
 ![](images/Use_Case.png)
 
+
 ## Макет агента
 
 ![](images/Макет%20Al-Шеф_v2.png)
