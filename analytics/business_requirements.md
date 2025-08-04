@@ -6,7 +6,7 @@
 
 ## Use case 
 
-![](images/Use_Case.png)
+![](images/analytics/use-case.png)
 
 
 ## Макет агента
