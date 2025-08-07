@@ -1,4 +1,6 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from .callback import handle_callback
+
 
 # Главное меню выбора категории продуктов
 category_menu = InlineKeyboardMarkup([
