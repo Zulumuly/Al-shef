@@ -1,5 +1,5 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from .callback import handle_callback
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ContextTypes
 
 
 # Главное меню выбора категории продуктов
@@ -123,6 +123,74 @@ product_keyboards = {
     "cat_canned": canned_keyboard,
 }
 
+next_step_keyboard = InlineKeyboardMarkup([
+    [InlineKeyboardButton("➕ Добавить ещё продукт", callback_data="add_more_products")],
+    [InlineKeyboardButton("➡️ Перейти к выбору приёмов пищи", callback_data="choose_meals_days")]
+])
+
+
+finish_selection_keyboard = InlineKeyboardMarkup([
+    [InlineKeyboardButton("➡️ Продолжить", callback_data="choose_meals_days")]
+])
+
+
+async def handle_grams_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_input = update.message.text
+    step = context.user_data.get("step")
+
+    if step == "waiting_for_days":
+        try:
+            days = int(user_input)
+            context.user_data["days"] = days
+            context.user_data["step"] = "waiting_for_meals"
+            await update.message.reply_text("Сколько приёмов пищи в день?")
+        except ValueError:
+            await update.message.reply_text("Введите корректное число дней.")
+        return
+
+    elif step == "waiting_for_meals":
+        try:
+            meals = int(user_input)
+            context.user_data["meals"] = meals
+            context.user_data["step"] = None
+            await update.message.reply_text(
+                f"Формирую план на {context.user_data['days']} дней × {meals} приёмов пищи.\n\n"
+                f"(Данные будут переданы AI модели)"
+            )
+        except ValueError:
+            await update.message.reply_text("Введите корректное число приёмов пищи.")
+        return
+
+    elif step == "waiting_for_grams":
+        try:
+            grams = int(user_input)
+            product = context.user_data.get("selected_product")
+
+            if not product:
+                await update.message.reply_text("Пожалуйста, выберите продукт.")
+                return
+
+            ingredients = context.user_data.get("ingredients", [])
+            ingredients.append({"product": product, "grams": grams})
+            context.user_data["ingredients"] = ingredients
+
+            # сбрасываем шаг
+            context.user_data["step"] = None
+            context.user_data["selected_product"] = None
+
+            await update.message.reply_text(
+                f"Продукт добавлен: {product} — {grams} г.\nЧто дальше?",
+                reply_markup=next_step_keyboard
+            )
+
+        except ValueError:
+            await update.message.reply_text("Пожалуйста, введите число (в граммах).")
+        return
+
+    # если нет подходящего шага — ничего не делаем
+    await update.message.reply_text("Сначала выберите продукт из меню.")
+
+
 # Получение продукта из callback_data
 product_prefix = "prod_"
 
@@ -130,3 +198,6 @@ def get_product_name(data):
     if data.startswith(product_prefix):
         return data[len(product_prefix):]
     return None
+
+
+
