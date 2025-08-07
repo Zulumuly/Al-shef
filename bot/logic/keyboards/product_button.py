@@ -8,6 +8,8 @@ category_menu = InlineKeyboardMarkup([
      InlineKeyboardButton("🍞 Бакалея", callback_data="cat_grocery")],
     [InlineKeyboardButton("🧀 Молочное", callback_data="cat_dairy"),
      InlineKeyboardButton("🌾 Зерновое", callback_data="cat_grains")],
+    [InlineKeyboardButton("🐟 Рыба и морепродукты", callback_data="cat_fish"),
+     InlineKeyboardButton("🥫 Консервы", callback_data="cat_canned")],
     [InlineKeyboardButton("✅ Завершить выбор", callback_data="finish_selection")]
 ])
 
@@ -67,19 +69,44 @@ grocery_keyboard = InlineKeyboardMarkup([
     [InlineKeyboardButton("⬅️ Назад", callback_data="back_to_categories")]
 ])
 
-# Молочное
-dairy_keyboard = InlineKeyboardMarkup([
-    [InlineKeyboardButton("🥛 Молоко", callback_data="add_Молоко"),
-     InlineKeyboardButton("🧀 Сыр", callback_data="add_Сыр")],
-    [InlineKeyboardButton("🍦 Йогурт", callback_data="add_Йогурт")],
+milk_keyboard = InlineKeyboardMarkup([
+    [InlineKeyboardButton("🥛 Молоко", callback_data="prod_Молоко"),
+     InlineKeyboardButton("🧀 Сыр", callback_data="prod_Сыр")],
+    [InlineKeyboardButton("🍦 Сливки", callback_data="prod_Сливки"),
+     InlineKeyboardButton("🍶 Кефир", callback_data="prod_Кефир")],
+    [InlineKeyboardButton("🥣 Йогурт", callback_data="prod_Йогурт"),
+     InlineKeyboardButton("🧈 Масло", callback_data="prod_Масло")],
+    [InlineKeyboardButton("🥚 Яйцо", callback_data="prod_Яйцо")],
     [InlineKeyboardButton("⬅️ Назад", callback_data="back_to_categories")]
 ])
 
-# Зерновое
 grains_keyboard = InlineKeyboardMarkup([
-    [InlineKeyboardButton("🍞 Хлеб", callback_data="add_Хлеб"),
-     InlineKeyboardButton("🥣 Овсянка", callback_data="add_Овсянка")],
-    [InlineKeyboardButton("🌽 Кукуруза", callback_data="add_Кукуруза")],
+    [InlineKeyboardButton("🍞 Хлеб", callback_data="prod_Хлеб"),
+     InlineKeyboardButton("🍚 Рис", callback_data="prod_Рис")],
+    [InlineKeyboardButton("🥣 Овсянка", callback_data="prod_Овсянка"),
+     InlineKeyboardButton("🌾 Гречка", callback_data="prod_Гречка")],
+    [InlineKeyboardButton("🌽 Кукурузная крупа", callback_data="prod_Кукурузная крупа"),
+     InlineKeyboardButton("🍝 Макароны", callback_data="prod_Макароны")],
+    [InlineKeyboardButton("⬅️ Назад", callback_data="back_to_categories")]
+])
+
+fish_keyboard = InlineKeyboardMarkup([
+    [InlineKeyboardButton("🐟 Лосось", callback_data="prod_Лосось"),
+     InlineKeyboardButton("🐠 Тунец", callback_data="prod_Тунец")],
+    [InlineKeyboardButton("🦐 Креветки", callback_data="prod_Креветки"),
+     InlineKeyboardButton("🦑 Кальмары", callback_data="prod_Кальмары")],
+    [InlineKeyboardButton("🐡 Треска", callback_data="prod_Треска"),
+     InlineKeyboardButton("🦞 Лангуст", callback_data="prod_Лангуст")],
+    [InlineKeyboardButton("⬅️ Назад", callback_data="back_to_categories")]
+])
+
+# Консервы
+canned_keyboard = InlineKeyboardMarkup([
+    [InlineKeyboardButton("🥫 Фасоль консерв.", callback_data="prod_Фасоль консервированная"),
+     InlineKeyboardButton("🥫 Кукуруза консерв.", callback_data="prod_Кукуруза консервированная")],
+    [InlineKeyboardButton("🥫 Тунец консерв.", callback_data="prod_Тунец консервированный"),
+     InlineKeyboardButton("🥫 Горошек консерв.", callback_data="prod_Горошек консервированный")],
+    [InlineKeyboardButton("🥫 Томатная паста", callback_data="prod_Томатная паста")],
     [InlineKeyboardButton("⬅️ Назад", callback_data="back_to_categories")]
 ])
 
@@ -87,4 +114,17 @@ grains_keyboard = InlineKeyboardMarkup([
 product_keyboards = {
     "cat_vegetables": vegetables_keyboard,
     "cat_fruits": fruits_keyboard,
+    "cat_meat": meat_keyboard,
+    "cat_dairy": milk_keyboard,
+    "cat_grains": grains_keyboard,
+    "cat_fish": fish_keyboard,
+    "cat_canned": canned_keyboard,
 }
+
+# Получение продукта из callback_data
+product_prefix = "prod_"
+
+def get_product_name(data):
+    if data.startswith(product_prefix):
+        return data[len(product_prefix):]
+    return None
