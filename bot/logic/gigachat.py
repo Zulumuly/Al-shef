@@ -55,23 +55,39 @@ _gigachat = GigaChat(
 
 
 # --- prompt helpers -----------------------------------------------------------
+# --- prompt helpers -----------------------------------------------------------
 
 def _ingredients_to_text(ingredients: List[Dict]) -> str:
+    """Читабельный список ингредиентов для промпта."""
     if not ingredients:
         return "—"
     lines = []
     for it in ingredients:
-        prod = str(it.get("product", "")).strip()
+        prod = str(it.get("product") or "").strip()
         grams = it.get("grams")
-        lines.append(f"- {prod}" + (f" — {grams} г" if grams is not None else ""))
+        if not prod:
+            continue
+        if isinstance(grams, (int, float)):
+            lines.append(f"- {prod} — {int(grams)} г")
+        else:
+            lines.append(f"- {prod}")
     return "\n".join(lines)
 
 
 def _json_prompt(ingredients: List[Dict], days: int, meals_per_day: int) -> str:
     return (
-        "Ты — профессиональный нутрициолог. "
-        "Сначала оцени, хватит ли указанных продуктов на заявленные дни и приёмы пищи, "
-        "потом сформируй план питания. Верни ОТВЕТ СТРОГО В JSON без пояснительного текста.\n\n"
+        "Ты — кулинарный ассистент и нутрициолог. "
+        "Твоя задача: НАЙТИ/СОБРАТЬ ПЛАН ИЗ РЕЦЕПТОВ на заданные дни и приёмы пищи, "
+        "используя ТОЛЬКО перечисленные пользователем ингредиенты (и базовые специи: соль, перец, вода, растительное масло, сушёные травы). "
+        "Суммарный расход каждого продукта по всему плану НЕ должен превышать доступное количество.\n\n"
+        "Требования:\n"
+        "• На КАЖДЫЙ день и КАЖДЫЙ приём укажи ОДИН конкретный рецепт (название).\n"
+        "• Для каждого рецепта явно перечисли ингредиенты с граммами ИЗ КОРЗИНЫ, плюс допустимые специи.\n"
+        "• Дай пошаговые инструкции (1, 2, 3…), примерное время готовки и количество порций.\n"
+        "• Не повторяй одно и то же блюдо чаще, чем через один приём у пользователя.\n"
+        "• В конце плана добавь «Сводный расход»: «продукт — израсходовано/доступно».\n"
+        "• Если продуктов не хватает на все N×M приёмов — сократи число дней до посильного и объясни почему.\n"
+        "• Верни ОТВЕТ СТРОГО В JSON (без любого текста вне JSON) по схеме ниже.\n\n"
         f"Доступные продукты:\n{_ingredients_to_text(ingredients)}\n\n"
         f"Запрошено дней: {days}\n"
         f"Приёмов пищи в день: {meals_per_day}\n\n"
@@ -81,18 +97,26 @@ def _json_prompt(ingredients: List[Dict], days: int, meals_per_day: int) -> str:
         '  "meals_per_day": <int>,\n'
         '  "feasible_days_without_purchases": <int>,\n'
         '  "decision": "ok" | "reduce" | "need_purchases",\n'
-        '  "summary_reason": "<кратко почему>",\n'
+        '  "summary_reason": "<кратко почему сократили или что докупить>",\n'
         '  "shortages": [ {"product":"...", "approx_grams_needed": <int>} ],\n'
         '  "shopping_list_for_requested_days": [ {"product":"...", "grams": <int>} ],\n'
-        '  "plan_markdown": "<план в Markdown на feasible_days_without_purchases дней>"\n'
+        '  "plan_markdown": "<Markdown c РЕЦЕПТАМИ на feasible_days_without_purchases дней>"\n'
         "}\n\n"
-        "- Если всего хватает на все дни → decision = \"ok\" и верни план на requested_days.\n"
-        "- Если не хватает, но можно покрыть меньше дней без докупок → decision = \"reduce\" и верни "
-        "  feasible_days_without_purchases < requested_days + план на это число дней.\n"
-        "- Если без покупок сделать план нельзя (0 дней) → decision = \"need_purchases\" и верни shopping_list.\n"
-        "- В plan_markdown для каждого дня укажи Завтрак/Обед/Ужин, порции (г) и примерную калорийность."
+        "Требования к полю plan_markdown (Markdown, русский язык):\n"
+        "## План рецептов на X дней × Y приёмов\n"
+        "### День 1\n"
+        "- Завтрак — *Название рецепта*\n"
+        "  - Ингредиенты: продукт — граммы; ... (только из корзины + специи)\n"
+        "  - Шаги: 1) ... 2) ... 3) ...\n"
+        "  - Время: ~N мин | Порции: K\n"
+        "- Обед — *Название рецепта* …\n"
+        "- Ужин — *Название рецепта* …\n"
+        "…далее все дни…\n\n"
+        "### Сводный расход\n"
+        "- Курица: 480 г / 500 г\n"
+        "- Рис: 290 г / 300 г\n"
+        "…\n"
     )
-
 
 def _extract_json_block(text: str) -> dict | None:
     m = re.search(r"\{.*\}", text, re.DOTALL)

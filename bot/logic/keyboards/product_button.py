@@ -63,8 +63,6 @@ meat_keyboard = InlineKeyboardMarkup([
 
 # Бакалея — ИСПРАВЛЕНО: все callback_data -> "prod_..."
 grocery_keyboard = InlineKeyboardMarkup([
-    [InlineKeyboardButton("🍚 Рис", callback_data="prod_Рис"),
-     InlineKeyboardButton("🫘 Фасоль", callback_data="prod_Фасоль")],
     [InlineKeyboardButton("🧂 Соль", callback_data="prod_Соль")],
     [InlineKeyboardButton("⬅️ Назад", callback_data="back_to_categories")]
 ])
@@ -87,6 +85,8 @@ grains_keyboard = InlineKeyboardMarkup([
      InlineKeyboardButton("🌾 Гречка", callback_data="prod_Гречка")],
     [InlineKeyboardButton("🌽 Кукурузная крупа", callback_data="prod_Кукурузная крупа"),
      InlineKeyboardButton("🍝 Макароны", callback_data="prod_Макароны")],
+    [InlineKeyboardButton("🍚 Рис", callback_data="prod_Рис"),
+     InlineKeyboardButton("🫘 Фасоль", callback_data="prod_Фасоль")],
     [InlineKeyboardButton("⬅️ Назад", callback_data="back_to_categories")]
 ])
 
