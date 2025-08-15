@@ -35,7 +35,7 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception:
         pass
 
-async def bootstrap() -> None:
+def main() -> None:
     load_dotenv()
 
     bot_token = os.getenv("BOT_TOKEN")
@@ -49,12 +49,13 @@ async def bootstrap() -> None:
     secret = (os.getenv("WEBHOOK_SECRET") or "").strip() or None
     port = int(os.getenv("PORT", "10000"))
 
-    # Инициализируем БД в этом же event loop
-    await init_db()
+    # 1) Инициализируем БД (отдельный краткоживущий цикл)
+    asyncio.run(init_db())
 
+    # 2) Создаём приложение
     app = Application.builder().token(bot_token).build()
 
-    # Хэндлеры
+    # 3) Хэндлеры
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("plan",  cmd_plan))
     app.add_handler(CommandHandler("last",  cmd_last))
@@ -63,17 +64,20 @@ async def bootstrap() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_grams_input))
     app.add_error_handler(on_error)
 
-    # Публикуем команды в левом меню
-    await app.bot.set_my_commands([
+    # 4) Создаём event loop вручную (нужно для Py 3.13 + run_webhook)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    # 5) Публикуем команды в левом меню (в нашем loop)
+    loop.run_until_complete(app.bot.set_my_commands([
         BotCommand("plan",  "Составить план питания"),
         BotCommand("last",  "План питания"),
         BotCommand("saved", "Сохраненные рецепты"),
-    ])
+    ]))
+    logging.info("Commands published")
 
-    # Полностью manual lifecycle (PTB v21): initialize -> start -> start_webhook
-    await app.initialize()
-    await app.start()
-    await app.start_webhook(
+    # 6) Запускаем webhook-сервер (блокирующе)
+    app.run_webhook(
         listen="0.0.0.0",
         port=port,
         url_path=url_path,
@@ -81,16 +85,8 @@ async def bootstrap() -> None:
         secret_token=secret,
         drop_pending_updates=True,
         # allowed_updates=None,
+        # max_connections=40,
     )
-    logging.info("✅ Webhook started at %s/%s", base_url.rstrip("/"), url_path)
-
-    try:
-        # держим сервис живым
-        await asyncio.Event().wait()
-    finally:
-        await app.stop_webhook()
-        await app.stop()
-        await app.shutdown()
 
 if __name__ == "__main__":
-    asyncio.run(bootstrap())
+    main()
