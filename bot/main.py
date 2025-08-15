@@ -56,7 +56,7 @@ async def bootstrap() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_grams_input))
     app.add_error_handler(on_error)
 
-    # Готовим событие остановки по сигналам
+    # Ожидание по сигналам
     stop_event = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -65,7 +65,6 @@ async def bootstrap() -> None:
         except NotImplementedError:
             pass  # Windows / некоторые среды
 
-    # Полностью async-жизненный цикл PTB v21
     async with app:
         # Публикуем команды для меню слева от строки ввода
         await app.bot.set_my_commands([
@@ -74,17 +73,15 @@ async def bootstrap() -> None:
             BotCommand("saved", "Сохраненные рецепты"),
         ])
 
+        # В PTB 21.x этого достаточно, чтобы начать polling
         await app.start()
-        await app.start_polling(drop_pending_updates=True)
         print("✅ Бот запущен (polling)")
 
         try:
             await stop_event.wait()  # ждём Ctrl+C / SIGTERM
         finally:
-            await app.stop_polling()
             await app.stop()
             await app.shutdown()
 
 if __name__ == "__main__":
     asyncio.run(bootstrap())
-
