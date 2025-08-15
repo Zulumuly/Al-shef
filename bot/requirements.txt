@@ -1,6 +1,13 @@
 python-telegram-bot==20.8
 SQLAlchemy>=2.0,<3
 asyncpg>=0.29
-langchain-gigachat>=0.3.0
-gigachat>=0.3.15
+greenlet>=3.0
+
+# LangChain ядро и адаптер GigaChat
+langchain-core>=0.2,<0.3
+langchain-gigachat==0.1.10
+
+# Официальный SDK GigaChat (актуальные — 0.1.x)
+gigachat==0.1.42.post1
+
 python-dotenv>=1.0
