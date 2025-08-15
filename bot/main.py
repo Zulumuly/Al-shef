@@ -35,15 +35,6 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception:
         pass
 
-async def _post_init(app: Application) -> None:
-    # Публикуем команды в левом меню
-    await app.bot.set_my_commands([
-        BotCommand("plan",  "Составить план питания"),
-        BotCommand("last",  "План питания"),
-        BotCommand("saved", "Сохраненные рецепты"),
-    ])
-    logging.info("Commands published")
-
 def main() -> None:
     load_dotenv()
 
@@ -51,21 +42,14 @@ def main() -> None:
     if not bot_token:
         raise RuntimeError("BOT_TOKEN не задан")
 
-    # URL твоего сервиса на Render, например: https://al-shef.onrender.com
     base_url = os.getenv("WEBHOOK_BASE_URL")
     if not base_url:
-        raise RuntimeError("WEBHOOK_BASE_URL не задан (укажи публичный HTTPS-URL Web Service)")
-
-    # Секрет для заголовка X-Telegram-Bot-Api-Secret-Token (задай случайную строку)
-    secret = os.getenv("WEBHOOK_SECRET", "").strip() or None
-
-    # Путь вебхука (часть URL после домена). Можно оставить по умолчанию.
+        raise RuntimeError("WEBHOOK_BASE_URL не задан (публичный HTTPS-URL Web Service)")
     url_path = os.getenv("WEBHOOK_PATH", "tg-webhook").lstrip("/")
-
-    # Порт, который выдаёт Render
+    secret = (os.getenv("WEBHOOK_SECRET") or "").strip() or None
     port = int(os.getenv("PORT", "10000"))
 
-    # Инициализируем БД до старта приложения
+    # Инициализируем БД ДО старта приложения
     asyncio.run(init_db())
 
     app = Application.builder().token(bot_token).build()
@@ -79,15 +63,25 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_grams_input))
     app.add_error_handler(on_error)
 
-    # Запускаем встроенный aiohttp-сервер и регистрируем вебхук в Telegram
+    # Публикуем команды до запуска вебхука
+    async def _publish_commands():
+        await app.bot.set_my_commands([
+            BotCommand("plan",  "Составить план питания"),
+            BotCommand("last",  "План питания"),
+            BotCommand("saved", "Сохраненные рецепты"),
+        ])
+    asyncio.run(_publish_commands())
+
+    # Запуск вебхука (PTB 21.x)
     app.run_webhook(
         listen="0.0.0.0",
         port=port,
         url_path=url_path,
         webhook_url=f"{base_url.rstrip('/')}/{url_path}",
-        secret_token=secret,        # можно None, но лучше задать
+        secret_token=secret,
         drop_pending_updates=True,
-        post_init=_post_init,
+        # allowed_updates=None,       # при необходимости можно ограничить типы апдейтов
+        # max_connections=40,         # можно настроить
     )
 
 if __name__ == "__main__":
