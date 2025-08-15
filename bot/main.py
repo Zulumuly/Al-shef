@@ -6,7 +6,7 @@ import signal
 from dotenv import load_dotenv
 from telegram import Update, BotCommand
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, CallbackQueryHandler,
+    Application, CommandHandler, CallbackQueryHandler,
     MessageHandler, ContextTypes, filters,
 )
 
@@ -45,7 +45,7 @@ async def bootstrap() -> None:
     # Инициализация БД в том же event loop, что и приложение
     await init_db()
 
-    app = ApplicationBuilder().token(bot_token).build()
+    app = Application.builder().token(bot_token).build()
 
     # Хэндлеры
     app.add_handler(CommandHandler("start", start))
@@ -65,7 +65,7 @@ async def bootstrap() -> None:
         except NotImplementedError:
             pass  # Windows / некоторые среды
 
-    # Полностью async-жизненный цикл PTB
+    # Полностью async-жизненный цикл PTB v21
     async with app:
         # Публикуем команды для меню слева от строки ввода
         await app.bot.set_my_commands([
@@ -75,15 +75,16 @@ async def bootstrap() -> None:
         ])
 
         await app.start()
-        await app.updater.start_polling(drop_pending_updates=True)
+        await app.start_polling(drop_pending_updates=True)
         print("✅ Бот запущен (polling)")
 
         try:
             await stop_event.wait()  # ждём Ctrl+C / SIGTERM
         finally:
-            await app.updater.stop()
+            await app.stop_polling()
             await app.stop()
             await app.shutdown()
 
 if __name__ == "__main__":
     asyncio.run(bootstrap())
+
