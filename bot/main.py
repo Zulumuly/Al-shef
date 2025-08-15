@@ -2,7 +2,6 @@
 import os
 import logging
 import asyncio
-import signal
 from dotenv import load_dotenv
 from telegram import Update, BotCommand
 from telegram.ext import (
@@ -14,11 +13,11 @@ from logic.keyboards.start_button import start
 from logic.keyboards.callback import handle_callback, handle_grams_input
 from db.database import init_db
 
-# Универсальный импорт команд (поддержит оба размещения файла)
+# Универсальный импорт команд
 try:
     from logic.commands import cmd_plan, cmd_last, cmd_saved
 except ImportError:
-    from logic.keyboards.command import cmd_plan, cmd_last, cmd_saved  # если файл у тебя тут
+    from logic.keyboards.command import cmd_plan, cmd_last, cmd_saved
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -36,14 +35,38 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception:
         pass
 
-async def bootstrap() -> None:
+async def _post_init(app: Application) -> None:
+    # Публикуем команды в левом меню
+    await app.bot.set_my_commands([
+        BotCommand("plan",  "Составить план питания"),
+        BotCommand("last",  "План питания"),
+        BotCommand("saved", "Сохраненные рецепты"),
+    ])
+    logging.info("Commands published")
+
+def main() -> None:
     load_dotenv()
+
     bot_token = os.getenv("BOT_TOKEN")
     if not bot_token:
-        raise RuntimeError("BOT_TOKEN не задан в .env")
+        raise RuntimeError("BOT_TOKEN не задан")
 
-    # Инициализация БД в том же event loop, что и приложение
-    await init_db()
+    # URL твоего сервиса на Render, например: https://al-shef.onrender.com
+    base_url = os.getenv("WEBHOOK_BASE_URL")
+    if not base_url:
+        raise RuntimeError("WEBHOOK_BASE_URL не задан (укажи публичный HTTPS-URL Web Service)")
+
+    # Секрет для заголовка X-Telegram-Bot-Api-Secret-Token (задай случайную строку)
+    secret = os.getenv("WEBHOOK_SECRET", "").strip() or None
+
+    # Путь вебхука (часть URL после домена). Можно оставить по умолчанию.
+    url_path = os.getenv("WEBHOOK_PATH", "tg-webhook").lstrip("/")
+
+    # Порт, который выдаёт Render
+    port = int(os.getenv("PORT", "10000"))
+
+    # Инициализируем БД до старта приложения
+    asyncio.run(init_db())
 
     app = Application.builder().token(bot_token).build()
 
@@ -56,32 +79,16 @@ async def bootstrap() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_grams_input))
     app.add_error_handler(on_error)
 
-    # Ожидание по сигналам
-    stop_event = asyncio.Event()
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
-            loop.add_signal_handler(sig, stop_event.set)
-        except NotImplementedError:
-            pass  # Windows / некоторые среды
-
-    async with app:
-        # Публикуем команды для меню слева от строки ввода
-        await app.bot.set_my_commands([
-            BotCommand("plan",  "Составить план питания"),
-            BotCommand("last",  "План питания"),
-            BotCommand("saved", "Сохраненные рецепты"),
-        ])
-
-        # В PTB 21.x этого достаточно, чтобы начать polling
-        await app.start()
-        print("✅ Бот запущен (polling)")
-
-        try:
-            await stop_event.wait()  # ждём Ctrl+C / SIGTERM
-        finally:
-            await app.stop()
-            await app.shutdown()
+    # Запускаем встроенный aiohttp-сервер и регистрируем вебхук в Telegram
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        url_path=url_path,
+        webhook_url=f"{base_url.rstrip('/')}/{url_path}",
+        secret_token=secret,        # можно None, но лучше задать
+        drop_pending_updates=True,
+        post_init=_post_init,
+    )
 
 if __name__ == "__main__":
-    asyncio.run(bootstrap())
+    main()
