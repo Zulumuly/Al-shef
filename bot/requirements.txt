@@ -1,0 +1,6 @@
+python-telegram-bot==20.8
+SQLAlchemy>=2.0,<3
+asyncpg>=0.29
+langchain-gigachat>=0.3.0
+gigachat>=0.3.15
+python-dotenv>=1.0
