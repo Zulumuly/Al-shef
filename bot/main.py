@@ -35,7 +35,7 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     except Exception:
         pass
 
-def main() -> None:
+async def bootstrap() -> None:
     load_dotenv()
 
     bot_token = os.getenv("BOT_TOKEN")
@@ -49,8 +49,8 @@ def main() -> None:
     secret = (os.getenv("WEBHOOK_SECRET") or "").strip() or None
     port = int(os.getenv("PORT", "10000"))
 
-    # Инициализируем БД ДО старта приложения
-    asyncio.run(init_db())
+    # Инициализируем БД в этом же event loop
+    await init_db()
 
     app = Application.builder().token(bot_token).build()
 
@@ -63,26 +63,34 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_grams_input))
     app.add_error_handler(on_error)
 
-    # Публикуем команды до запуска вебхука
-    async def _publish_commands():
-        await app.bot.set_my_commands([
-            BotCommand("plan",  "Составить план питания"),
-            BotCommand("last",  "План питания"),
-            BotCommand("saved", "Сохраненные рецепты"),
-        ])
-    asyncio.run(_publish_commands())
+    # Публикуем команды в левом меню
+    await app.bot.set_my_commands([
+        BotCommand("plan",  "Составить план питания"),
+        BotCommand("last",  "План питания"),
+        BotCommand("saved", "Сохраненные рецепты"),
+    ])
 
-    # Запуск вебхука (PTB 21.x)
-    app.run_webhook(
+    # Полностью manual lifecycle (PTB v21): initialize -> start -> start_webhook
+    await app.initialize()
+    await app.start()
+    await app.start_webhook(
         listen="0.0.0.0",
         port=port,
         url_path=url_path,
         webhook_url=f"{base_url.rstrip('/')}/{url_path}",
         secret_token=secret,
         drop_pending_updates=True,
-        # allowed_updates=None,       # при необходимости можно ограничить типы апдейтов
-        # max_connections=40,         # можно настроить
+        # allowed_updates=None,
     )
+    logging.info("✅ Webhook started at %s/%s", base_url.rstrip("/"), url_path)
+
+    try:
+        # держим сервис живым
+        await asyncio.Event().wait()
+    finally:
+        await app.stop_webhook()
+        await app.stop()
+        await app.shutdown()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(bootstrap())
