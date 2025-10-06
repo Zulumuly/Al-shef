@@ -1,76 +1,140 @@
-from __future__ import annotations
-import json
-from typing import Any, Dict, Optional, List
+# db/crud.py
 from sqlalchemy import select, desc
-from .database import SessionLocal
-from .models import Plan
+from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
+import logging
+from .models import NutritionPlan
+from .session import get_db_session
+
+logger = logging.getLogger(__name__)
 
 async def save_plan(
-    *,
     user_id: int,
     plan_md: str,
     requested_days: int,
     meals_per_day: int,
-    feasible_days: int | None,
-    decision: str | None,
-    ingredients: list[dict] | None,
+    feasible_days: int | None = None,
+    decision: str | None = None,
+    ingredients: list[dict] | None = None,
 ) -> str:
-    async with SessionLocal() as session:
-        rec = Plan(
-            user_id=user_id,
-            plan_md=plan_md,
-            requested_days=requested_days,
-            meals_per_day=meals_per_day,
-            feasible_days=feasible_days,
-            decision=decision,
-            ingredients_json=json.dumps(ingredients or [], ensure_ascii=False),
-        )
-        session.add(rec)
-        await session.commit()
-        return rec.id
+    """Сохраняет план питания в базу данных."""
+    async with get_db_session() as session:
+        try:
+            title = f"План на {feasible_days or requested_days} дней"
+            
+            plan = NutritionPlan(
+                user_id=user_id,
+                title=title,
+                plan_md=plan_md,
+                requested_days=requested_days,
+                meals_per_day=meals_per_day,
+                feasible_days=feasible_days,
+                decision=decision,
+                ingredients=ingredients or []
+            )
+            
+            session.add(plan)
+            await session.commit()
+            await session.refresh(plan)
+            
+            logger.info(f"Plan saved for user {user_id}, plan_id: {plan.id}")
+            return str(plan.id)
+            
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Error saving plan: {e}")
+            raise
 
-async def get_latest_plan(user_id: int) -> Optional[Dict[str, Any]]:
-    async with SessionLocal() as session:
-        q = select(Plan).where(Plan.user_id == user_id).order_by(desc(Plan.created_at)).limit(1)
-        row = (await session.execute(q)).scalars().first()
-        if not row:
+async def get_latest_plan(user_id: int) -> dict | None:
+    """Возвращает последний сохраненный план пользователя."""
+    async with get_db_session() as session:
+        try:
+            stmt = (
+                select(NutritionPlan)
+                .where(NutritionPlan.user_id == user_id)
+                .order_by(desc(NutritionPlan.created_at))
+                .limit(1)
+            )
+            
+            result = await session.execute(stmt)
+            plan = result.scalar_one_or_none()
+            
+            if plan:
+                return {
+                    "id": str(plan.id),
+                    "title": plan.title,
+                    "plan_md": plan.plan_md,
+                    "requested_days": plan.requested_days,
+                    "meals_per_day": plan.meals_per_day,
+                    "feasible_days": plan.feasible_days,
+                    "decision": plan.decision,
+                    "ingredients": plan.ingredients,
+                    "created_at": plan.created_at
+                }
             return None
-        return {
-            "id": row.id,
-            "plan_md": row.plan_md,
-            "requested_days": row.requested_days,
-            "meals_per_day": row.meals_per_day,
-            "feasible_days": row.feasible_days,
-            "decision": row.decision,
-            "ingredients": json.loads(row.ingredients_json or "[]"),
-            "created_at": row.created_at.isoformat() if row.created_at else None,
-        }
-
-async def list_plan_summaries(user_id: int) -> List[Dict[str, Any]]:
-    async with SessionLocal() as session:
-        q = select(Plan).where(Plan.user_id == user_id).order_by(desc(Plan.created_at))
-        rows = (await session.execute(q)).scalars().all()
-        out: List[Dict[str, Any]] = []
-        for r in rows:
-            title = f"{r.requested_days}д × {r.meals_per_day}пп"
-            if r.feasible_days is not None and r.feasible_days != r.requested_days:
-                title += f" (посил.: {r.feasible_days}д)"
-            out.append({"id": r.id, "title": title, "created_at": r.created_at.isoformat() if r.created_at else None})
-        return out
-
-async def get_plan_by_id(user_id: int, plan_id: str) -> Optional[Dict[str, Any]]:
-    async with SessionLocal() as session:
-        q = select(Plan).where(Plan.user_id == user_id, Plan.id == plan_id).limit(1)
-        r = (await session.execute(q)).scalars().first()
-        if not r:
+            
+        except Exception as e:
+            logger.error(f"Error getting latest plan: {e}")
             return None
-        return {
-            "id": r.id,
-            "plan_md": r.plan_md,
-            "requested_days": r.requested_days,
-            "meals_per_day": r.meals_per_day,
-            "feasible_days": r.feasible_days,
-            "decision": r.decision,
-            "ingredients": json.loads(r.ingredients_json or "[]"),
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-        }
+
+async def list_plan_summaries(user_id: int, limit: int = 10) -> list[dict]:
+    """Возвращает список планов пользователя."""
+    async with get_db_session() as session:
+        try:
+            stmt = (
+                select(NutritionPlan)
+                .where(NutritionPlan.user_id == user_id)
+                .order_by(desc(NutritionPlan.created_at))
+                .limit(limit)
+            )
+            
+            result = await session.execute(stmt)
+            plans = result.scalars().all()
+            
+            return [
+                {
+                    "id": str(plan.id),
+                    "title": plan.title,
+                    "created_at": plan.created_at,
+                    "requested_days": plan.requested_days,
+                    "feasible_days": plan.feasible_days
+                }
+                for plan in plans
+            ]
+            
+        except Exception as e:
+            logger.error(f"Error listing plans: {e}")
+            return []
+
+async def get_plan_by_id(user_id: int, plan_id: str) -> dict | None:
+    """Возвращает план по ID."""
+    async with get_db_session() as session:
+        try:
+            stmt = (
+                select(NutritionPlan)
+                .where(
+                    NutritionPlan.user_id == user_id,
+                    NutritionPlan.id == plan_id
+                )
+            )
+            
+            result = await session.execute(stmt)
+            plan = result.scalar_one_or_none()
+            
+            if plan:
+                return {
+                    "id": str(plan.id),
+                    "title": plan.title,
+                    "plan_md": plan.plan_md,
+                    "requested_days": plan.requested_days,
+                    "meals_per_day": plan.meals_per_day,
+                    "feasible_days": plan.feasible_days,
+                    "decision": plan.decision,
+                    "ingredients": plan.ingredients,
+                    "created_at": plan.created_at
+                }
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting plan by ID: {e}")
+            return None

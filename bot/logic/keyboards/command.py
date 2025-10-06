@@ -3,32 +3,25 @@ from __future__ import annotations
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from db.crud import get_latest_plan, list_plan_summaries
-from logic.keyboards.product_button import category_menu
-
-def _ensure_cart(context: ContextTypes.DEFAULT_TYPE) -> None:
-    context.user_data.setdefault("ingredients", [])
-
-def _cart_summary(context: ContextTypes.DEFAULT_TYPE) -> str:
-    items = context.user_data.get("ingredients", [])
-    if not items:
-        return "Пока ничего не добавлено."
-    return "\n".join(f"• {it.get('product')} — {it.get('grams')} г" for it in items)
 
 async def _send_long_text(message_obj, text: str) -> None:
+    """Отправляет длинный текст по частям (чтобы не превышать лимит Telegram)."""
     chunk = 3900
     text = text or ""
     for i in range(0, len(text), chunk):
         await message_obj.reply_text(text[i:i+chunk])
 
-# /plan — перейти к выбору продуктов
+# /plan — пользователь вводит список продуктов
 async def cmd_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    _ensure_cart(context)
-    context.user_data["step"] = None
     await update.message.reply_text(
-        "Выбери категорию продуктов:"
-        f"\n— уже выбрано позиций: {len(context.user_data['ingredients'])}",
-        reply_markup=category_menu
+        "Введите список продуктов и их количество (в граммах):\n\n"
+        "Например:\n"
+        "• курица 500 г\n"
+        "• рис 200 г\n"
+        "• помидоры 300 г\n\n"
+        "После этого я подберу рецепты и составлю план питания 🍽"
     )
+    context.user_data["awaiting_ingredients"] = True
 
 # /last — показать последний сохранённый план
 async def cmd_last(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -38,7 +31,7 @@ async def cmd_last(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await _send_long_text(update.message, rec["plan_md"])
 
-# /saved — список сохранённых планов (до 10)
+# /saved — список сохранённых планов
 async def cmd_saved(update: Update, context: ContextTypes.DEFAULT_TYPE):
     items = await list_plan_summaries(update.effective_user.id)
     if not items:

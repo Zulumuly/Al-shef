@@ -1,23 +1,22 @@
-from __future__ import annotations
+# db/models.py
+from sqlalchemy import Column, String, Integer, DateTime, Text, JSON
+from datetime import datetime
 import uuid
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import BigInteger, String, Integer, Text
-from sqlalchemy.sql import func
-from sqlalchemy.types import DateTime
 from .database import Base
 
-class Plan(Base):
-    __tablename__ = "plans"
+class NutritionPlan(Base):
+    __tablename__ = "nutrition_plans"
 
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id: Mapped[int] = mapped_column(BigInteger, index=True)  # Telegram user_id
-    plan_md: Mapped[str] = mapped_column(Text)  # сам план в Markdown/тексте
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(Integer, nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    plan_md = Column(Text, nullable=False)
+    requested_days = Column(Integer, nullable=False)
+    meals_per_day = Column(Integer, nullable=False)
+    feasible_days = Column(Integer, nullable=True)
+    decision = Column(String(50), nullable=True)  # "ok", "reduce", "need_purchases"
+    ingredients = Column(JSON, nullable=True)  # Список продуктов
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    requested_days: Mapped[int] = mapped_column(Integer)
-    meals_per_day: Mapped[int] = mapped_column(Integer)
-    feasible_days: Mapped[int | None] = mapped_column(Integer, nullable=True)  # «посильные» дни, если не хватило
-    decision: Mapped[str | None] = mapped_column(String(32), nullable=True)    # ok/reduce/need_purchases/fallback
-
-    ingredients_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # исходные продукты в JSON-строке
-
-    created_at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    def __repr__(self):
+        return f"<NutritionPlan(id={self.id}, user_id={self.user_id}, title={self.title})>"
