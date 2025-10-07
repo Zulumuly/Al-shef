@@ -18,10 +18,11 @@ def get_database_url() -> str:
 
     if database_url:
         # Приводим к асинхронному формату
-        if database_url.startswith("postgres://"):
-            database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        if database_url.startswith("postgresql://"):
+            database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
         elif database_url.startswith("postgresql://"):
-            database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
         logger.info("Using DATABASE_URL from environment")
         return database_url
