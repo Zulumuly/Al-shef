@@ -1,15 +1,14 @@
-# --- Telegram bot ---
 python-telegram-bot==20.6
 python-dotenv==1.0.0
 
-# --- Database ---
+# Database
 SQLAlchemy==2.0.23
 asyncpg==0.29.0
 aiosqlite==0.19.0
 
-# --- LangChain + GigaChat ---
+# LangChain + GigaChat
 langchain==0.3.7
-langchain-core==0.3.15
+langchain-core==0.3.18
 langchain-community==0.3.7
 langchain-gigachat==0.3.10
 gigachat==0.1.42.post2
