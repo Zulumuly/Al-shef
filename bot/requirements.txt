@@ -8,8 +8,8 @@ asyncpg==0.29.0
 aiosqlite==0.19.0
 
 # --- LangChain + GigaChat ---
-langchain==0.2.16
-langchain-core==0.2.41
-langchain-community==0.2.12
+langchain==0.3.7
+langchain-core==0.3.15
+langchain-community==0.3.7
 langchain-gigachat==0.3.10
 gigachat==0.1.42.post2
