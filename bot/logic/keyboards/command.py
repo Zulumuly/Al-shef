@@ -2,7 +2,7 @@
 from __future__ import annotations
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
-from bot.db.crud import get_latest_plan, list_plan_summaries
+from db.crud import get_latest_plan, list_plan_summaries
 
 async def _send_long_text(message_obj, text: str) -> None:
     """Отправляет длинный текст по частям (чтобы не превышать лимит Telegram)."""
