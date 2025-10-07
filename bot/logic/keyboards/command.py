@@ -1,8 +1,8 @@
-# logic/commands.py
+# bot/logic/commands.py
 from __future__ import annotations
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
-from db.crud import get_latest_plan, list_plan_summaries
+from bot.db.crud import get_latest_plan, list_plan_summaries
 
 async def _send_long_text(message_obj, text: str) -> None:
     """Отправляет длинный текст по частям (чтобы не превышать лимит Telegram)."""
@@ -11,8 +11,8 @@ async def _send_long_text(message_obj, text: str) -> None:
     for i in range(0, len(text), chunk):
         await message_obj.reply_text(text[i:i+chunk])
 
-# /plan — пользователь вводит список продуктов
-async def cmd_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# /start — пользователь вводит список продуктов (раньше было /plan)
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Введите список продуктов и их количество (в граммах):\n\n"
         "Например:\n"
@@ -23,19 +23,22 @@ async def cmd_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     context.user_data["awaiting_ingredients"] = True
 
-# /last — показать последний сохранённый план
-async def cmd_last(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# /saved — показать последний сохранённый план
+async def cmd_saved(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rec = await get_latest_plan(update.effective_user.id)
     if not rec:
-        await update.message.reply_text("Пока сохранённых планов нет.")
+        await update.message.reply_text("📂 Пока сохранённых планов нет.")
     else:
         await _send_long_text(update.message, rec["plan_md"])
 
-# /saved — список сохранённых планов
-async def cmd_saved(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# /like — список сохранённых рецептов (аналогично планам)
+async def cmd_like(update: Update, context: ContextTypes.DEFAULT_TYPE):
     items = await list_plan_summaries(update.effective_user.id)
     if not items:
-        await update.message.reply_text("Сохранённых планов пока нет.")
+        await update.message.reply_text("❤️ Сохранённых рецептов пока нет.")
         return
-    rows = [[InlineKeyboardButton(i["title"], callback_data=f"show_plan:{i['id']}")] for i in items[:10]]
-    await update.message.reply_text("Выберите план:", reply_markup=InlineKeyboardMarkup(rows))
+    rows = [
+        [InlineKeyboardButton(f"📋 {i['title']}", callback_data=f"show_plan:{i['id']}")]
+        for i in items[:10]
+    ]
+    await update.message.reply_text("Ваши сохранённые рецепты:", reply_markup=InlineKeyboardMarkup(rows))
