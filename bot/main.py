@@ -15,7 +15,7 @@ from db.database import init_db
 
 # Импорт команд
 try:
-    from logic.commands import cmd_last, cmd_saved
+    from logic.keyboards.command import cmd_last, cmd_saved
 except ImportError:
     async def cmd_last(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Пока сохранённых планов нет.")

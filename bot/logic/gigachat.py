@@ -11,7 +11,8 @@ from typing import List, Dict, Any
 
 from dotenv import load_dotenv
 from langchain_gigachat import GigaChat
-from langchain.schema import SystemMessage, HumanMessage  # ✅ новый импорт
+from langchain_core.messages import SystemMessage, HumanMessage
+
 
 load_dotenv()
 
