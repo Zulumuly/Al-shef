@@ -9,8 +9,8 @@ aiosqlite==0.19.0
 psycopg[binary,pool]==3.1.18
 
 # LangChain и GigaChat
-langchain==0.1.16
-langchain-core==0.1.42
+langchain==0.1.20
+langchain-core==0.1.52
 langchain-community==0.0.38
 langchain-gigachat==0.3.10
-gigachat==0.1.42.post2
+
