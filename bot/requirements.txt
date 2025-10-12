@@ -1,4 +1,5 @@
-python-telegram-bot==20.6
 SQLAlchemy==2.0.29
 asyncpg
+psycopg2-binary
+python-telegram-bot==20.6
 requests
