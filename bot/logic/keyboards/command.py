@@ -115,26 +115,30 @@ async def handle_plan_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ————————————————————————————————————————————————————————
 async def show_saved(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает сохранённые планы питания из базы данных"""
-    user_id = update.message.from_user.id
+    # Универсально обрабатываем update от /saved или нажатия кнопки
+    message = update.message or update.callback_query.message
+    user_id = (
+        update.message.from_user.id
+        if update.message
+        else update.callback_query.from_user.id
+    )
 
     try:
         async with AsyncSessionLocal() as session:
             result = await session.execute(
-                MealPlan.__table__.select().where(MealPlan.user_id == user_id)
+                MealPlan.__table__.select().where(MealPlan.user_id == str(user_id))
             )
             plans = result.fetchall()
 
-        # Если у пользователя нет сохранённых планов
         if not plans:
-            await update.message.reply_text("📂 У вас пока нет сохранённых планов.")
+            await message.reply_text("📂 У вас пока нет сохранённых планов.")
             return
 
-        # Формируем список планов
         reply = "📋 *Ваши сохранённые планы:*\n\n"
         for i, row in enumerate(plans, start=1):
             reply += f"📅 *План {i}:*\n{row.plan_text}\n\n"
 
-        await update.message.reply_text(reply, parse_mode="Markdown")
+        await message.reply_text(reply, parse_mode="Markdown")
 
     except Exception as e:
-        await update.message.reply_text(f"❌ Ошибка при получении данных из базы: {e}")
+        await message.reply_text(f"❌ Ошибка при получении данных из базы: {e}")
