@@ -1,16 +1,12 @@
 import asyncio
-from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
+    ConversationHandler,
     MessageHandler,
     CallbackQueryHandler,
-    ConversationHandler,
-    ContextTypes,
     filters,
 )
-from config import BOT_TOKEN
-from db.database import Base, engine
 from logic.keyboards.start_button import start
 from logic.keyboards.command import (
     plan_start,
@@ -24,11 +20,12 @@ from logic.keyboards.command import (
     WAITING_MEALS,
     CONFIRM_PLAN,
 )
-
+from config import BOT_TOKEN
+from db.database import Base, engine
 
 # ————————————————————————————————————————————————————————
-async def on_startup(app: ApplicationBuilder):
-    """Создание таблиц БД при запуске"""
+async def on_startup():
+    """Создание таблиц при старте"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("✅ Database initialized")
@@ -36,23 +33,18 @@ async def on_startup(app: ApplicationBuilder):
 
 # ————————————————————————————————————————————————————————
 def main():
-    print("🚀 Starting bot...")
+    print("🤖 Starting bot...")
 
-    # Создание приложения
-    app = ApplicationBuilder().token(BOT_TOKEN).post_init(on_startup).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # ——— Команда /start
+    # — Команды
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("plan", plan_start))
+    app.add_handler(CommandHandler("saved", show_saved))  # исправлено
 
-    # ——— Команда /saved
-    app.add_handler(CommandHandler("saved", show_saved))
-
-    # ——— Основной ConversationHandler для составления плана питания
+    # — Диалог составления плана
     conv_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler("plan", plan_start),
-            MessageHandler(filters.Regex(".*Составить план питания.*"), plan_start),
-        ],
+        entry_points=[CommandHandler("plan", plan_start)],
         states={
             WAITING_PRODUCTS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_products)
@@ -68,16 +60,16 @@ def main():
             ],
         },
         fallbacks=[],
-        per_message=False,  
+        per_message=False,  # ✅ вернули правильный вариант
     )
 
     app.add_handler(conv_handler)
 
-    # ——— Запуск
-    print("🤖 Bot started successfully")
-    app.run_polling(drop_pending_updates=True)
+    # — Запуск
+    app.run_polling()
 
 
 # ————————————————————————————————————————————————————————
 if __name__ == "__main__":
+    asyncio.run(on_startup())
     main()

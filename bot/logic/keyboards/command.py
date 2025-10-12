@@ -11,7 +11,7 @@ from logic.llm.meal_plan_generator import generate_meal_plan
 from db.database import AsyncSessionLocal
 from db.models import MealPlan
 
-# ——— Состояния диалога
+# Состояния диалога
 WAITING_PRODUCTS, WAITING_DAYS, WAITING_MEALS, CONFIRM_PLAN = range(4)
 
 
@@ -24,7 +24,6 @@ async def plan_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ————————————————————————————————————————————————————————
 async def process_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Пользователь вводит продукты"""
     context.user_data["products"] = update.message.text.strip()
     await update.message.reply_text("На сколько дней составить план питания?")
     return WAITING_DAYS
@@ -32,7 +31,6 @@ async def process_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ————————————————————————————————————————————————————————
 async def process_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Пользователь вводит количество дней"""
     try:
         context.user_data["days"] = int(update.message.text.strip())
         await update.message.reply_text("Сколько приёмов пищи в день?")
@@ -44,7 +42,6 @@ async def process_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ————————————————————————————————————————————————————————
 async def process_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Пользователь вводит количество приёмов пищи"""
     try:
         context.user_data["meals"] = int(update.message.text.strip())
     except ValueError:
@@ -85,18 +82,24 @@ async def process_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ————————————————————————————————————————————————————————
 async def handle_plan_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка выбора: сохранить или пересоздать"""
+    """Обработка кнопок — сохранить или пересоздать"""
     query = update.callback_query
     await query.answer()
 
-    user_id = query.from_user.id
+    user_id = str(query.from_user.id)
     choice = query.data
     plan_text = context.user_data.get("plan_text")
 
     if choice == "save_plan":
         try:
             async with AsyncSessionLocal() as session:
-                plan = MealPlan(user_id=user_id, plan_text=plan_text)
+                plan = MealPlan(
+                    user_id=user_id,
+                    products=context.user_data.get("products"),
+                    days=context.user_data.get("days"),
+                    meals_per_day=context.user_data.get("meals"),
+                    plan_text=plan_text,
+                )
                 session.add(plan)
                 await session.commit()
 
@@ -116,7 +119,7 @@ async def handle_plan_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def show_saved(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает сохранённые планы питания из базы данных"""
     message = update.message or update.callback_query.message
-    user_id = str(update.effective_user.id)  # 👈 всегда строка
+    user_id = str(update.effective_user.id)
 
     try:
         async with AsyncSessionLocal() as session:
@@ -129,11 +132,16 @@ async def show_saved(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await message.reply_text("📂 У вас пока нет сохранённых планов.")
             return
 
-        reply = "📋 *Ваши сохранённые планы:*\n\n"
+        full_text = "📋 *Ваши сохранённые планы:*\n\n"
         for i, row in enumerate(plans, start=1):
-            reply += f"📅 *План {i}:*\n{row.plan_text}\n\n"
+            full_text += f"📅 *План {i}:*\n{row.plan_text}\n\n"
 
-        await message.reply_text(reply, parse_mode="Markdown")
+        # Разбиваем длинный текст, чтобы избежать ошибки Telegram
+        max_len = 4000
+        chunks = [full_text[i:i + max_len] for i in range(0, len(full_text), max_len)]
+
+        for chunk in chunks:
+            await message.reply_text(chunk, parse_mode="Markdown")
 
     except Exception as e:
         await message.reply_text(f"❌ Ошибка при получении данных из базы: {e}")
