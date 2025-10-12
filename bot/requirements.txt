@@ -2,3 +2,4 @@ python-telegram-bot==20.6
 SQLAlchemy==2.0.29
 asyncpg
 requests
+python-dotenv
