@@ -1,4 +1,5 @@
 import asyncio
+import nest_asyncio
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -62,7 +63,7 @@ conv_handler = ConversationHandler(
 )
 
 
-# ====== Основной запуск ======
+# ====== Основная функция ======
 async def main():
     print("🤖 Starting bot...")
     await init_db()
@@ -79,5 +80,11 @@ async def main():
     await app.run_polling()
 
 
+# ====== Запуск (устойчивый для Render, локали, Docker) ======
 if __name__ == "__main__":
-    asyncio.run(main())
+    nest_asyncio.apply()
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        print("🛑 Bot stopped manually")

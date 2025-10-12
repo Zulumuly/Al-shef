@@ -3,3 +3,4 @@ SQLAlchemy==2.0.29
 asyncpg
 requests
 python-dotenv
+nest_asyncio
