@@ -25,7 +25,6 @@ from config import BOT_TOKEN
 from db.database import Base, engine
 
 
-# 🔇 скрываем предупреждения PTBUserWarning
 warnings.filterwarnings("ignore", category=UserWarning, module="telegram")
 
 
@@ -37,17 +36,16 @@ async def on_startup():
 
 
 async def main():
-    print("🤖 Starting bot (async polling)...")
+    print("🤖 Starting bot (Render-safe polling)...")
 
-    # создаём приложение
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # команды
+    # Команды
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("plan", plan_start))
     app.add_handler(CommandHandler("saved", show_saved))
 
-    # диалог составления плана
+    # Диалог
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("plan", plan_start)],
         states={
@@ -60,9 +58,7 @@ async def main():
             WAITING_MEALS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_meals)
             ],
-            CONFIRM_PLAN: [
-                CallbackQueryHandler(handle_plan_choice)
-            ],
+            CONFIRM_PLAN: [CallbackQueryHandler(handle_plan_choice)],
         },
         fallbacks=[],
         per_message=False,
@@ -73,9 +69,23 @@ async def main():
     await on_startup()
     print("🤖 Bot started successfully")
 
-    # ❗ корректный запуск polling в PTB v21+
-    await app.run_polling()
+    # Запуск без закрытия event loop (для Render / Python 3.12)
+    try:
+        await app.initialize()
+        await app.start()
+        print("📡 Polling started")
+        await app.updater.start_polling()
+        await asyncio.Event().wait()  # держим процесс живым
+    finally:
+        await app.stop()
+        await app.shutdown()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except RuntimeError:
+        # Render иногда запускает event loop заранее
+        loop = asyncio.get_event_loop()
+        loop.create_task(main())
+        loop.run_forever()
