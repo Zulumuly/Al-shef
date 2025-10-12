@@ -1,21 +1,12 @@
-# bot/db/models.py
 from sqlalchemy import Column, Integer, String, Text
-from .database import Base
+from bot.db.database import Base
 
-# Таблица для планов питания
-class Plan(Base):
-    __tablename__ = "plans"
+class MealPlan(Base):
+    __tablename__ = "meal_plans"
 
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, nullable=False)        # Заголовок плана
-    content = Column(Text, nullable=False)        # Содержимое (например, markdown с меню)
-
-
-# Таблица для рецептов
-class Recipe(Base):
-    __tablename__ = "recipes"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)         # Название рецепта
-    ingredients = Column(Text, nullable=False)    # Ингредиенты (можно хранить как JSON-строку)
-    instructions = Column(Text, nullable=False)   # Пошаговое приготовление
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String, index=True)
+    products = Column(Text)
+    days = Column(Integer)
+    meals_per_day = Column(Integer)
+    plan_text = Column(Text)

@@ -1,44 +1,89 @@
-# bot/logic/commands.py
-from __future__ import annotations
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes
-from db.crud import get_latest_plan, list_plan_summaries
+from telegram import Update
+from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, filters
+from bot.db.database import SessionLocal
+from bot.db.models import MealPlan
+from bot.logic.llm.meal_plan_generator import generate_meal_plan
 
-async def _send_long_text(message_obj, text: str) -> None:
-    """Отправляет длинный текст по частям (чтобы не превышать лимит Telegram)."""
-    chunk = 3900
-    text = text or ""
-    for i in range(0, len(text), chunk):
-        await message_obj.reply_text(text[i:i+chunk])
+# --- FSM состояния ---
+WAITING_PRODUCTS, WAITING_DAYS, WAITING_MEALS = range(3)
 
-# /start — пользователь вводит список продуктов (раньше было /plan)
-async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Введите список продуктов и их количество (в граммах):\n\n"
-        "Например:\n"
-        "• курица 500 г\n"
-        "• рис 200 г\n"
-        "• помидоры 300 г\n\n"
-        "После этого я подберу рецепты и составлю план питания 🍽"
-    )
-    context.user_data["awaiting_ingredients"] = True
 
-# /saved — показать последний сохранённый план
-async def cmd_saved(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rec = await get_latest_plan(update.effective_user.id)
-    if not rec:
-        await update.message.reply_text("📂 Пока сохранённых планов нет.")
+# --- План питания ---
+async def plan_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Введите список доступных продуктов через запятую:")
+    return WAITING_PRODUCTS
+
+
+async def process_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["products"] = [p.strip() for p in update.message.text.split(",") if p.strip()]
+    await update.message.reply_text("На сколько дней вы хотите составить план?")
+    return WAITING_DAYS
+
+
+async def process_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        days = int(update.message.text)
+    except ValueError:
+        await update.message.reply_text("Введите число дней (например, 3):")
+        return WAITING_DAYS
+
+    context.user_data["days"] = days
+    await update.message.reply_text("Сколько приёмов пищи в день?")
+    return WAITING_MEALS
+
+
+async def process_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        meals = int(update.message.text)
+    except ValueError:
+        await update.message.reply_text("Введите число (например, 4):")
+        return WAITING_MEALS
+
+    products = context.user_data["products"]
+    days = context.user_data["days"]
+
+    await update.message.reply_text("⏳ Генерирую план питания...")
+
+    plan_text = generate_meal_plan(products, days, meals)
+
+    async with SessionLocal() as session:
+        plan = MealPlan(
+            user_id=str(update.effective_user.id),
+            products=", ".join(products),
+            days=days,
+            meals_per_day=meals,
+            plan_text=plan_text
+        )
+        session.add(plan)
+        await session.commit()
+
+    await update.message.reply_text(f"✅ Ваш план питания:\n\n{plan_text}")
+    return ConversationHandler.END
+
+
+# --- Показ сохранённого плана ---
+async def show_saved(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async with SessionLocal() as session:
+        result = await session.execute(
+            MealPlan.__table__.select().where(MealPlan.user_id == str(update.effective_user.id))
+        )
+        plan = result.first()
+        if not plan:
+            await update.message.reply_text("❌ У вас нет сохранённого плана.")
+        else:
+            await update.message.reply_text(f"📋 Ваш сохранённый план:\n\n{plan.plan_text}")
+
+
+# --- Реакции на кнопки ---
+async def handle_text_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка нажатий на кнопки меню"""
+    text = update.message.text.strip().lower()
+
+    if "составить план" in text:
+        return await plan_start(update, context)
+    elif "сохранённый план" in text:
+        return await show_saved(update, context)
+    elif "избранные рецепты" in text:
+        await update.message.reply_text("❤️ Раздел 'Избранное' в разработке!")
     else:
-        await _send_long_text(update.message, rec["plan_md"])
-
-# /like — список сохранённых рецептов (аналогично планам)
-async def cmd_like(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    items = await list_plan_summaries(update.effective_user.id)
-    if not items:
-        await update.message.reply_text("❤️ Сохранённых рецептов пока нет.")
-        return
-    rows = [
-        [InlineKeyboardButton(f"📋 {i['title']}", callback_data=f"show_plan:{i['id']}")]
-        for i in items[:10]
-    ]
-    await update.message.reply_text("Ваши сохранённые рецепты:", reply_markup=InlineKeyboardMarkup(rows))
+        await update.message.reply_text("Я не понимаю эту команду 😅\nПопробуйте выбрать из меню.")

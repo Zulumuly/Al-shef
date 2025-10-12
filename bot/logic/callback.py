@@ -4,7 +4,7 @@ from telegram.ext import ContextTypes
 from telegram.error import BadRequest
 
 from db.crud import save_plan, get_latest_plan, list_plan_summaries, get_plan_by_id
-from logic.gigachat import assess_and_plan  
+from bot.logic.llm.gigachat_api import assess_and_plan  
 
 
 # ---------- helpers ----------
