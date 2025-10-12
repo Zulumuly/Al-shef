@@ -1,5 +1,6 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, ConversationHandler, CallbackQueryHandler
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+
+from telegram.ext import ContextTypes, ConversationHandler
 
 from db.crud import create_meal_plan, get_meal_plan
 from logic.llm.gigachat_api import ask_gigachat  
