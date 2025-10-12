@@ -29,7 +29,7 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("plan", plan_start),
-            MessageHandler(filters.Regex(".*Составить план питания.*"), plan_start)
+            MessageHandler(filters.Regex(".*Составить план питания.*"), plan_start),
         ],
         states={
             WAITING_PRODUCTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_products)],
