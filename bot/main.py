@@ -1,5 +1,7 @@
 # bot/main.py
 
+from telegram.ext import ApplicationBuilder, CommandHandler, ConversationHandler, MessageHandler, filters
+
 from config import BOT_TOKEN
 from db.database import Base, engine
 from logic.keyboards.start_button import start
