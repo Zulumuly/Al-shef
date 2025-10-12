@@ -1,6 +1,6 @@
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
-from text import WELCOME_TEXT
+from .text import WELCOME_TEXT
 
 
 # Определяем клавиатуру — как у @iqos_russia_bot
