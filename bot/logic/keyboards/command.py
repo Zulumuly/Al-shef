@@ -1,8 +1,7 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 from logic.llm.meal_plan_generator import generate_meal_plan
-from db.crud import create_meal_plan, get_meal_plan  # ✅ исправлено
-from config import GIGACHAT_TOKEN
+from db.crud import create_meal_plan, get_meal_plan  # ✅ корректные функции
 
 # 🔹 Состояния диалога
 WAITING_PRODUCTS, WAITING_DAYS, WAITING_MEALS, CONFIRM_PLAN = range(4)
@@ -83,7 +82,7 @@ async def handle_plan_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if choice == "save_plan":
         try:
-            await create_meal_plan(  # ✅ сохранение в БД
+            await create_meal_plan(
                 user_id=user_id,
                 products=context.user_data.get("products"),
                 days=context.user_data.get("days"),
@@ -106,14 +105,13 @@ async def show_saved(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Вывести сохранённый план из БД"""
     user_id = str(update.message.from_user.id)
     try:
-        plan = await get_meal_plan(user_id)  # ✅ исправлено имя функции
+        plan = await get_meal_plan(user_id)
         if not plan:
             await update.message.reply_text(
                 "📂 У вас пока нет сохранённых планов.\n\n"
                 "Нажмите /plan, чтобы составить новый 🍽️"
             )
         else:
-            # Если текст слишком длинный — делим на части
             chunks = [plan.plan_text[i:i + 3500] for i in range(0, len(plan.plan_text), 3500)]
             await update.message.reply_text("📋 Ваш сохранённый план:\n")
             for part in chunks:
