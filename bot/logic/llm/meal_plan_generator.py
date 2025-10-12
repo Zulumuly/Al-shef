@@ -1,3 +1,5 @@
+from logic.llm.gigachat_api import ask_gigachat
+
 def generate_meal_plan(products: str, days: int, meals_per_day: int) -> str:
     """
     Формирует жёсткий промт для GigaChat.
