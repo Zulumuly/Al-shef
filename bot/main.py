@@ -23,26 +23,27 @@ from logic.keyboards.command import (
 from config import BOT_TOKEN
 from db.database import Base, engine
 
-# ————————————————————————————————————————————————————————
+
+# ————————————————————————————————————————————
 async def on_startup():
-    """Создание таблиц при старте"""
+    """Создаёт таблицы при старте"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("✅ Database initialized")
 
 
-# ————————————————————————————————————————————————————————
-def main():
+# ————————————————————————————————————————————
+async def main():
     print("🤖 Starting bot...")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # — Команды
+    # Команды
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("plan", plan_start))
-    app.add_handler(CommandHandler("saved", show_saved))  # исправлено
+    app.add_handler(CommandHandler("saved", show_saved))
 
-    # — Диалог составления плана
+    # Диалог
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("plan", plan_start)],
         states={
@@ -60,16 +61,20 @@ def main():
             ],
         },
         fallbacks=[],
-        per_message=False,  # ✅ вернули правильный вариант
+        per_message=False,  # ✅ корректно
     )
 
     app.add_handler(conv_handler)
 
-    # — Запуск
-    app.run_polling()
+    # Запуск polling в рамках текущего event loop
+    await app.initialize()
+    await app.start()
+    print("🤖 Bot started successfully")
+    await app.updater.start_polling()
+    await app.updater.idle()
 
 
-# ————————————————————————————————————————————————————————
+# ————————————————————————————————————————————
 if __name__ == "__main__":
     asyncio.run(on_startup())
-    main()
+    asyncio.run(main())
