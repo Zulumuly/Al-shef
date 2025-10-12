@@ -10,7 +10,7 @@ from logic.keyboards.command import (
     WAITING_PRODUCTS, WAITING_DAYS, WAITING_MEALS
 )
 
-async def on_startup():
+async def on_startup(app):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("✅ Database initialized")
