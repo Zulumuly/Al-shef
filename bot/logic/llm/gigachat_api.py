@@ -1,74 +1,51 @@
-import os
-import uuid
 import requests
-import base64
-import time
-
-CERT_PATH = os.path.join(os.path.dirname(__file__), "sber.pem")
+import os
+import json
 
 CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GIGACHAT_CLIENT_SECRET")
 
-TOKEN_CACHE = {"token": None, "expires": 0}
+TOKEN_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
 
 
 def get_access_token():
-    """Получаем access token через OAuth2"""
-    now = time.time()
-    if TOKEN_CACHE["token"] and now < TOKEN_CACHE["expires"]:
-        return TOKEN_CACHE["token"]
-
-    auth_key = f"{CLIENT_ID}:{CLIENT_SECRET}".encode("utf-8")
-    auth_b64 = base64.b64encode(auth_key).decode("utf-8")
-
     headers = {
+        "Authorization": f"Basic {requests.utils.quote(f'{CLIENT_ID}:{CLIENT_SECRET}')}",
+        "RqUID": "12345678-1234-1234-1234-123456789012",
         "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/json",
-        "RqUID": str(uuid.uuid4()),
-        "Authorization": f"Basic {auth_b64}",
     }
-
     data = {"scope": "GIGACHAT_API_PERS"}
-
-    response = requests.post(
-        "https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
-        headers=headers,
-        data=data,
-        verify=CERT_PATH,
-    )
+    response = requests.post(TOKEN_URL, headers=headers, data=data, verify=False)
 
     if response.status_code != 200:
-        raise Exception(f"Ошибка получения токена: {response.text}")
+        raise Exception(f"Ошибка получения токена: {response.status_code}, {response.text}")
 
     token_data = response.json()
-    TOKEN_CACHE["token"] = token_data["access_token"]
-    TOKEN_CACHE["expires"] = now + 1700
-    return TOKEN_CACHE["token"]
+    return token_data.get("access_token")
 
 
-def ask_gigachat(prompt: str):
-    """Отправка запроса в GigaChat"""
-    token = get_access_token()
+def ask_gigachat(prompt: str) -> str:
+    try:
+        token = get_access_token()
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
 
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
+        payload = {
+            "model": "GigaChat:latest",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+            "max_tokens": 800
+        }
 
-    payload = {
-        "model": "GigaChat",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7,
-    }
+        response = requests.post(CHAT_URL, headers=headers, json=payload, timeout=60, verify=False)
+        response.raise_for_status()
 
-    response = requests.post(
-        "https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
-        headers=headers,
-        json=payload,
-        verify=CERT_PATH,
-    )
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
 
-    if response.status_code != 200:
-        raise Exception(f"Ошибка при обращении к GigaChat: {response.status_code} {response.text}")
-
-    return response.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"❌ Ошибка при обращении к GigaChat: {e}")
+        return "Ошибка при обращении к GigaChat 😞"
