@@ -1,14 +1,63 @@
 import asyncio
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, filters, ConversationHandler
+    ApplicationBuilder,
+    MessageHandler,
+    ConversationHandler,  
+    ContextTypes,
+    filters,
 )
-from config import BOT_TOKEN
 from db.database import init_db
-from logic.keyboards.command import (
-    start, handle_products, handle_days, handle_meals, show_saved_plan
-)
+from logic.keyboards.command import handle_products, handle_days, handle_meals, show_saved_plan
 
+
+# Состояния диалога
 PRODUCTS, DAYS, MEALS = range(3)
+
+
+# Нижнее меню
+def main_menu_keyboard():
+    return ReplyKeyboardMarkup(
+        [["Составить план питания", "Сохранённый план"]],
+        resize_keyboard=True
+    )
+
+
+# Стартовое сообщение
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Привет 👋 Я помогу тебе составить план питания.\nВыбери действие:",
+        reply_markup=main_menu_keyboard()
+    )
+
+
+# Обработка нажатия кнопок
+async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+
+    if text == "Составить план питания":
+        await update.message.reply_text("Введите список продуктов (через запятую):")
+        return PRODUCTS
+
+    elif text == "Сохранённый план":
+        await show_saved_plan(update, context)
+        return ConversationHandler.END
+
+    else:
+        await update.message.reply_text("Пожалуйста, выберите действие с помощью кнопок ниже 👇")
+        return ConversationHandler.END
+
+
+# Основной диалог
+conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu)],
+    states={
+        PRODUCTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_products)],
+        DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_days)],
+        MEALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_meals)],
+    },
+    fallbacks=[],
+)
 
 
 async def main():
@@ -16,43 +65,19 @@ async def main():
     await init_db()
     print("✅ Database initialized")
 
-    app = (
-        ApplicationBuilder()
-        .token(BOT_TOKEN)
-        .concurrent_updates(True)
-        .build()
-    )
+    from config import BOT_TOKEN
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    conv = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            PRODUCTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_products)],
-            DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_days)],
-            MEALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_meals)],
-        },
-        fallbacks=[CommandHandler("saved", show_saved_plan)],
-    )
+    # Добавляем только ConversationHandler
+    app.add_handler(conv_handler)
 
-    app.add_handler(conv)
-    app.add_handler(CommandHandler("saved", show_saved_plan))
-
-    print("🤖 Bot started successfully ✅")
-
-    # ⚙️ Главный трюк: используем текущий loop и не закрываем его
     await app.initialize()
     await app.start()
-    print("✅ Polling started...")
+    print("🤖 Bot started successfully ✅")
+
     await app.updater.start_polling()
-    await asyncio.Event().wait()  # держим приложение "вечно"
+    await asyncio.Event().wait()
 
 
 if __name__ == "__main__":
-    # 🔧 Не создаём новый event loop, используем уже существующий
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    loop.create_task(main())
-    loop.run_forever()
+    asyncio.run(main())
