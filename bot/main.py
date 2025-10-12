@@ -1,6 +1,6 @@
-# bot/main.py
-from telegram.ext import ApplicationBuilder, CommandHandler, ConversationHandler, MessageHandler, filters
-
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, ConversationHandler, MessageHandler, filters
+)
 from config import BOT_TOKEN
 from db.database import Base, engine
 from logic.keyboards.start_button import start
@@ -10,16 +10,17 @@ from logic.keyboards.command import (
     WAITING_PRODUCTS, WAITING_DAYS, WAITING_MEALS
 )
 
+async def on_startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("✅ Database initialized")
+
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # --- /start ---
     app.add_handler(CommandHandler("start", start))
-
-    # --- /saved ---
     app.add_handler(CommandHandler("saved", show_saved))
 
-    # --- Диалог составления плана ---
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("plan", plan_start),
@@ -32,11 +33,11 @@ def main():
         },
         fallbacks=[],
     )
-    app.add_handler(conv_handler)
 
-    # --- Обработка нажатий кнопок меню ---
+    app.add_handler(conv_handler)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
 
+    app.post_init = on_startup
     print("🤖 Bot started successfully")
     app.run_polling()
 
