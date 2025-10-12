@@ -1,3 +1,6 @@
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ContextTypes, ConversationHandler
+
 from logic.llm.meal_plan_generator import generate_meal_plan
 from db.crud import create_meal_plan, get_meal_plan
 
