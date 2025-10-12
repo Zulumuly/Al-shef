@@ -1,5 +1,4 @@
 # bot/main.py
-
 from telegram.ext import ApplicationBuilder, CommandHandler, ConversationHandler, MessageHandler, filters
 
 from config import BOT_TOKEN
