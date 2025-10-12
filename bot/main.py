@@ -40,12 +40,12 @@ async def main():
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Команды
+    # 🟢 Только команды (слева)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("plan", plan_start))
     app.add_handler(CommandHandler("saved", show_saved))
 
-    # Диалог
+    # 🔁 Диалог составления плана
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("plan", plan_start)],
         states={
@@ -69,13 +69,12 @@ async def main():
     await on_startup()
     print("🤖 Bot started successfully")
 
-    # Запуск без закрытия event loop (для Render / Python 3.12)
     try:
         await app.initialize()
         await app.start()
         print("📡 Polling started")
         await app.updater.start_polling()
-        await asyncio.Event().wait()  # держим процесс живым
+        await asyncio.Event().wait()
     finally:
         await app.stop()
         await app.shutdown()
@@ -85,7 +84,6 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except RuntimeError:
-        # Render иногда запускает event loop заранее
         loop = asyncio.get_event_loop()
         loop.create_task(main())
         loop.run_forever()

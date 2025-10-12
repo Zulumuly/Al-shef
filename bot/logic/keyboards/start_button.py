@@ -1,15 +1,12 @@
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update
 from telegram.ext import ContextTypes
-from logic.keyboards.text import WELCOME_TEXT
+from .text import WELCOME_TEXT
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        ["🍽️ Составить план питания"],
-        ["📂 Сохранённый план"],
-    ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
+    """Приветствие"""
     await update.message.reply_text(
-        f"{WELCOME_TEXT}\n\nВыберите действие:",
-        reply_markup=reply_markup
+        f"{WELCOME_TEXT}\n\n"
+        "Доступные команды:\n"
+        "🍽️ /plan — составить план питания\n"
+        "📂 /saved — сохранённый план питания"
     )
