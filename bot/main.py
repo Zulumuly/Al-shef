@@ -25,18 +25,20 @@ from logic.keyboards.command import (
     CONFIRM_PLAN,
 )
 
-# ——————————————————————————————————————————————
-async def on_startup(_: ApplicationBuilder):
+
+# ————————————————————————————————————————————————————————
+async def on_startup(app: ApplicationBuilder):
     """Создание таблиц БД при запуске"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("✅ Database initialized")
 
 
-# ——————————————————————————————————————————————
+# ————————————————————————————————————————————————————————
 def main():
     print("🚀 Starting bot...")
 
+    # Создание приложения
     app = ApplicationBuilder().token(BOT_TOKEN).post_init(on_startup).build()
 
     # ——— Команда /start
@@ -45,17 +47,25 @@ def main():
     # ——— Команда /saved
     app.add_handler(CommandHandler("saved", show_saved))
 
-    # ——— Основной ConversationHandler для создания плана
+    # ——— Основной ConversationHandler для составления плана питания
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("plan", plan_start),
             MessageHandler(filters.Regex(".*Составить план питания.*"), plan_start),
         ],
         states={
-            WAITING_PRODUCTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_products)],
-            WAITING_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_days)],
-            WAITING_MEALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_meals)],
-            CONFIRM_PLAN: [CallbackQueryHandler(handle_plan_choice)],
+            WAITING_PRODUCTS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, process_products)
+            ],
+            WAITING_DAYS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, process_days)
+            ],
+            WAITING_MEALS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, process_meals)
+            ],
+            CONFIRM_PLAN: [
+                CallbackQueryHandler(handle_plan_choice)
+            ],
         },
         fallbacks=[],
     )
@@ -67,6 +77,6 @@ def main():
     app.run_polling(drop_pending_updates=True)
 
 
-# ——————————————————————————————————————————————
+# ————————————————————————————————————————————————————————
 if __name__ == "__main__":
     main()
