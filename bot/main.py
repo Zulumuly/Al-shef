@@ -13,8 +13,6 @@ PRODUCTS, DAYS, MEALS = range(3)
 
 async def main():
     print("🤖 Starting bot...")
-
-    # БД и бот живут в одном loop
     await init_db()
     print("✅ Database initialized")
 
@@ -39,9 +37,22 @@ async def main():
     app.add_handler(CommandHandler("saved", show_saved_plan))
 
     print("🤖 Bot started successfully ✅")
-    await app.run_polling()   # никаких close_loop=False, никаких run_until_complete
+
+    # ⚙️ Главный трюк: используем текущий loop и не закрываем его
+    await app.initialize()
+    await app.start()
+    print("✅ Polling started...")
+    await app.updater.start_polling()
+    await asyncio.Event().wait()  # держим приложение "вечно"
 
 
 if __name__ == "__main__":
-    # просто run — PTB сам создаст/использует текущий loop
-    asyncio.run(main())
+    # 🔧 Не создаём новый event loop, используем уже существующий
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    loop.create_task(main())
+    loop.run_forever()
