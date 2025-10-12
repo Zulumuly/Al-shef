@@ -6,117 +6,99 @@ from logic.llm.gigachat_api import ask_gigachat
 
 
 # --- Состояния диалога ---
-ASK_PRODUCTS, ASK_DAYS, ASK_MEALS = range(3)
+PRODUCTS, DAYS, MEALS = range(3)
 
 
-# --- Старт ---
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# --- Главное меню ---
+def main_menu_keyboard():
     keyboard = [
-        [InlineKeyboardButton("🍽️ Составить план", callback_data="create_plan")],
-        [InlineKeyboardButton("📋 Показать сохранённый", callback_data="show_saved")],
+        ["📋 Показать сохранённый план", "🧠 Создать новый план"]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+
+# --- Стартовое сообщение ---
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Привет! Я помогу составить персональный план питания.\nВыберите действие:",
-        reply_markup=reply_markup,
+        "👋 Привет! Я помогу составить план питания.\n\n"
+        "Выберите действие 👇",
+        reply_markup=main_menu_keyboard()
     )
 
 
-# --- Начало создания плана ---
-async def handle_start_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text("📝 Введите список продуктов, которые вы хотите использовать:")
-    return ASK_PRODUCTS
+# --- Создание нового плана ---
+async def new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Введите список продуктов (через запятую):"
+    )
+    return PRODUCTS
 
 
-# --- Продукты ---
 async def handle_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["products"] = update.message.text
-    await update.message.reply_text("📅 На сколько дней нужен план?")
-    return ASK_DAYS
+    await update.message.reply_text("На сколько дней нужен план?")
+    return DAYS
 
 
-# --- Дни ---
 async def handle_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["days"] = update.message.text
-    await update.message.reply_text("🍴 Сколько приёмов пищи в день?")
-    return ASK_MEALS
+    await update.message.reply_text("Сколько приёмов пищи в день?")
+    return MEALS
 
 
-# --- Приёмы пищи + генерация плана ---
 async def handle_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = int(update.message.from_user.id)
-    meals_per_day = update.message.text.strip()
-    products = context.user_data.get("products")
-    days = context.user_data.get("days")
+    context.user_data["meals_per_day"] = update.message.text
 
-    await update.message.reply_text("🍳 Формирую план питания, подождите немного...")
+    products = context.user_data["products"]
+    days = context.user_data["days"]
+    meals_per_day = context.user_data["meals_per_day"]
 
-    prompt = f"""
-Ты — нутриционист. Составь план питания строго из списка продуктов ниже:
-{products}
+    await update.message.reply_text("Формирую план питания, подождите немного...")
 
-Условия:
-- План должен быть на {days} дней и {meals_per_day} приём пищи(ей) в день.
-- В рецептах нельзя использовать ничего, кроме указанных продуктов.
-- Формат вывода:
+    plan_text = ask_gigachat(
+        f"Составь план питания из продуктов: {products}. "
+        f"На {days} дней, {meals_per_day} приём(а) пищи в день. "
+        f"Не добавляй ничего лишнего. Формат:\n"
+        f"День 1:\n- Завтрак: ...\n  Рецепт: ..."
+    )
 
-День 1:
-- Завтрак: ...
-  Рецепт: ...
+    # Сохраняем результат в базу
+    await create_meal_plan(
+        user_id=user_id,
+        products=products,
+        days=days,
+        meals_per_day=meals_per_day,
+        plan_text=plan_text
+    )
 
-День 2:
-- ...
-"""
-
-    plan_text = ask_gigachat(prompt)
-
-    # Отправляем результат
-    await update.message.reply_text(f"✅ План питания сформирован:\n\n{plan_text}")
-
-    # Сохраняем в базу
-    await create_meal_plan(user_id, products, days, meals_per_day, plan_text)
-
-    # Inline-кнопки
-    keyboard = [
-        [InlineKeyboardButton("💾 Сохранить план", callback_data="save_plan")],
-        [InlineKeyboardButton("🔁 Составить заново", callback_data="new_plan")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
+    await update.message.reply_text("✅ План питания сохранён в базе данных.")
     await update.message.reply_text(
-        "Хотите сохранить этот план или составить новый?",
-        reply_markup=reply_markup,
+        plan_text if plan_text else "❌ Не удалось получить план от GigaChat."
+    )
+
+    # Возвращаем меню
+    await update.message.reply_text(
+        "Выберите действие 👇",
+        reply_markup=main_menu_keyboard()
     )
 
     return ConversationHandler.END
 
 
-# --- Callback: Сохранить ---
-async def handle_save_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text("✅ План сохранён! Можете вернуться к основному меню.")
-
-
-# --- Callback: Новый план ---
-async def handle_new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text("🆕 Хорошо! Введите список продуктов для нового плана.")
-    return ASK_PRODUCTS
-
-
-# --- Callback: Показать сохранённый ---
+# --- Показ сохранённого плана ---
 async def show_saved_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    user_id = int(query.from_user.id)
+    user_id = int(update.message.from_user.id)
     plan = await get_meal_plan(user_id)
 
     if plan:
-        await query.edit_message_text(f"📋 Ваш сохранённый план:\n\n{plan.plan_text}")
+        await update.message.reply_text(
+            f"📋 Ваш последний сохранённый план:\n\n{plan.plan_text}",
+            reply_markup=main_menu_keyboard()
+        )
     else:
-        await query.edit_message_text("❌ У вас пока нет сохранённого плана.")
+        await update.message.reply_text(
+            "❌ У вас ещё нет сохранённого плана.\n"
+            "Создайте новый, выбрав «🧠 Создать новый план».",
+            reply_markup=main_menu_keyboard()
+        )
