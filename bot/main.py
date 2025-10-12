@@ -1,14 +1,15 @@
 import asyncio
-import warnings
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
-    ConversationHandler,
     MessageHandler,
-    CallbackQueryHandler,
     filters,
+    CallbackQueryHandler,
+    ConversationHandler,
 )
-from logic.keyboards.start_button import start
+from config import BOT_TOKEN
+from db.database import init_db
 from logic.keyboards.command import (
     plan_start,
     process_products,
@@ -21,69 +22,38 @@ from logic.keyboards.command import (
     WAITING_MEALS,
     CONFIRM_PLAN,
 )
-from config import BOT_TOKEN
-from db.database import Base, engine
-
-
-warnings.filterwarnings("ignore", category=UserWarning, module="telegram")
-
-
-async def on_startup():
-    """Создать таблицы базы при старте"""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    print("✅ Database initialized")
+from logic.keyboards.start_button import start
 
 
 async def main():
-    print("🤖 Starting bot (Render-safe polling)...")
-
+    print("🤖 Starting bot...")
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # 🟢 Только команды (слева)
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("plan", plan_start))
-    app.add_handler(CommandHandler("saved", show_saved))
-
-    # 🔁 Диалог составления плана
+    # === Диалог для составления плана ===
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("plan", plan_start)],
         states={
-            WAITING_PRODUCTS: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, process_products)
-            ],
-            WAITING_DAYS: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, process_days)
-            ],
-            WAITING_MEALS: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, process_meals)
-            ],
+            WAITING_PRODUCTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_products)],
+            WAITING_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_days)],
+            WAITING_MEALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_meals)],
             CONFIRM_PLAN: [CallbackQueryHandler(handle_plan_choice)],
         },
         fallbacks=[],
-        per_message=False,
     )
 
+    # === Команды ===
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("saved", show_saved))
     app.add_handler(conv_handler)
 
-    await on_startup()
-    print("🤖 Bot started successfully")
+    # === Инициализация базы ===
+    await init_db()
+    print("✅ Database initialized")
 
-    try:
-        await app.initialize()
-        await app.start()
-        print("📡 Polling started")
-        await app.updater.start_polling()
-        await asyncio.Event().wait()
-    finally:
-        await app.stop()
-        await app.shutdown()
+    # === Запуск ===
+    print("🤖 Bot started successfully")
+    await app.run_polling()
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except RuntimeError:
-        loop = asyncio.get_event_loop()
-        loop.create_task(main())
-        loop.run_forever()
+    asyncio.run(main())

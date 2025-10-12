@@ -1,53 +1,54 @@
 import os
 import uuid
 import requests
-from config import GIGACHAT_AUTH_KEY, GIGACHAT_SCOPE
+import base64
+import time
 
-# 🌐 Эндпоинты GigaChat
-AUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
-CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
-CERT_PATH = os.path.join(os.path.dirname(__file__), "russian_trusted_root_ca_pem.crt")
+CERT_PATH = os.path.join(os.path.dirname(__file__), "sber.pem")
 
-# 🧠 Кэш токена
-ACCESS_TOKEN = None
-TOKEN_EXPIRES = None
+CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID")
+CLIENT_SECRET = os.getenv("GIGACHAT_CLIENT_SECRET")
+
+TOKEN_CACHE = {"token": None, "expires": 0}
 
 
 def get_access_token():
-    """Запрашивает новый access_token для GigaChat API"""
-    global ACCESS_TOKEN, TOKEN_EXPIRES
+    """Получаем access token через OAuth2"""
+    now = time.time()
+    if TOKEN_CACHE["token"] and now < TOKEN_CACHE["expires"]:
+        return TOKEN_CACHE["token"]
+
+    auth_key = f"{CLIENT_ID}:{CLIENT_SECRET}".encode("utf-8")
+    auth_b64 = base64.b64encode(auth_key).decode("utf-8")
 
     headers = {
-        "Authorization": GIGACHAT_AUTH_KEY,
-        "RqUID": str(uuid.uuid4()),
         "Content-Type": "application/x-www-form-urlencoded",
         "Accept": "application/json",
+        "RqUID": str(uuid.uuid4()),
+        "Authorization": f"Basic {auth_b64}",
     }
 
-    data = {"scope": GIGACHAT_SCOPE}
+    data = {"scope": "GIGACHAT_API_PERS"}
 
     response = requests.post(
-        AUTH_URL,
+        "https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
         headers=headers,
         data=data,
-        verify=CERT_PATH,  # сертификат Минцифры
+        verify=CERT_PATH,
     )
 
     if response.status_code != 200:
-        raise Exception(
-            f"Ошибка получения токена: {response.status_code} {response.text}"
-        )
+        raise Exception(f"Ошибка получения токена: {response.text}")
 
     token_data = response.json()
-    ACCESS_TOKEN = token_data["access_token"]
-    TOKEN_EXPIRES = token_data.get("expires_at")
-    print("✅ GigaChat access token obtained successfully")
-    return ACCESS_TOKEN
+    TOKEN_CACHE["token"] = token_data["access_token"]
+    TOKEN_CACHE["expires"] = now + 1700
+    return TOKEN_CACHE["token"]
 
 
-def ask_gigachat(prompt: str) -> str:
-    """Отправляет запрос в GigaChat"""
-    token = ACCESS_TOKEN or get_access_token()
+def ask_gigachat(prompt: str):
+    """Отправка запроса в GigaChat"""
+    token = get_access_token()
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -57,27 +58,17 @@ def ask_gigachat(prompt: str) -> str:
     payload = {
         "model": "GigaChat",
         "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.7,
     }
 
     response = requests.post(
-        CHAT_URL,
+        "https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
         headers=headers,
         json=payload,
         verify=CERT_PATH,
     )
 
-    # Если токен истёк — пробуем обновить
-    if response.status_code == 401:
-        print("⚠️ Токен истёк, запрашиваю новый...")
-        token = get_access_token()
-        headers["Authorization"] = f"Bearer {token}"
-        response = requests.post(
-            CHAT_URL,
-            headers=headers,
-            json=payload,
-            verify=CERT_PATH,
-        )
+    if response.status_code != 200:
+        raise Exception(f"Ошибка при обращении к GigaChat: {response.status_code} {response.text}")
 
-    response.raise_for_status()
-    data = response.json()
-    return data["choices"][0]["message"]["content"]
+    return response.json()["choices"][0]["message"]["content"]
