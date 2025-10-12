@@ -7,99 +7,122 @@ from telegram import ReplyKeyboardMarkup
 
 
 # --- Состояния диалога ---
-PRODUCTS, DAYS, MEALS = range(3)
-
+ASK_PRODUCTS, ASK_DAYS, ASK_MEALS = range(3)
 
 # --- Главное меню ---
 def main_menu_keyboard():
     keyboard = [
-        ["📋 Показать сохранённый план", "🧠 Создать новый план"]
+        ["🧠 Создать новый план"],
+        ["📋 Показать сохранённый план"]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+# --- Кнопки после генерации плана ---
+def after_plan_keyboard():
+    keyboard = [
+        ["✅ Сохранить план", "🔁 Создать новый план"]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
-# --- Стартовое сообщение ---
+# --- Старт / Главное меню ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "👋 Привет! Я помогу составить план питания.\n\n"
-        "Выберите действие 👇",
+        "Привет! 👋 Я помогу тебе составить персональный план питания.\n\n"
+        "Выбери действие ниже 👇",
         reply_markup=main_menu_keyboard()
     )
 
 
-# --- Создание нового плана ---
+# --- Начало создания нового плана ---
 async def new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Введите список продуктов (через запятую):"
+        "Введите продукты, которые вы хотите включить в рацион (через запятую):",
+        reply_markup=ReplyKeyboardRemove()
     )
-    return PRODUCTS
+    return ASK_PRODUCTS
 
 
+# --- Шаг 1: продукты ---
 async def handle_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["products"] = update.message.text
     await update.message.reply_text("На сколько дней нужен план?")
-    return DAYS
+    return ASK_DAYS
 
 
+# --- Шаг 2: дни ---
 async def handle_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["days"] = update.message.text
     await update.message.reply_text("Сколько приёмов пищи в день?")
-    return MEALS
+    return ASK_MEALS
 
 
+# --- Шаг 3: приёмы пищи ---
 async def handle_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = int(update.message.from_user.id)
-    context.user_data["meals_per_day"] = update.message.text
-
-    products = context.user_data["products"]
-    days = context.user_data["days"]
-    meals_per_day = context.user_data["meals_per_day"]
+    products = context.user_data.get("products")
+    days = context.user_data.get("days")
+    meals_per_day = context.user_data.get("meals_per_day", update.message.text)
 
     await update.message.reply_text("Формирую план питания, подождите немного...")
 
-    plan_text = ask_gigachat(
-        f"Составь план питания из продуктов: {products}. "
-        f"На {days} дней, {meals_per_day} приём(а) пищи в день. "
-        f"Не добавляй ничего лишнего. Формат:\n"
-        f"День 1:\n- Завтрак: ...\n  Рецепт: ..."
+    prompt = (
+        f"Составь план питания на {days} дней с {meals_per_day} приёмами пищи в день "
+        f"на основе следующих продуктов: {products}. "
+        "Укажи блюда и примерное описание по дням."
     )
 
-    # Сохраняем результат в базу
-    await create_meal_plan(
-        user_id=user_id,
-        products=products,
-        days=days,
-        meals_per_day=meals_per_day,
-        plan_text=plan_text
-    )
+    plan_text = ask_gigachat(prompt)
 
-    await update.message.reply_text("✅ План питания сохранён в базе данных.")
+    # сохраняем текст во временные данные пользователя
+    context.user_data["plan_text"] = plan_text
+
+    await update.message.reply_text(plan_text)
     await update.message.reply_text(
-        plan_text if plan_text else "❌ Не удалось получить план от GigaChat."
-    )
-
-    # Возвращаем меню
-    await update.message.reply_text(
-        "Выберите действие 👇",
-        reply_markup=main_menu_keyboard()
+        "Что вы хотите сделать дальше?",
+        reply_markup=after_plan_keyboard()
     )
 
     return ConversationHandler.END
 
 
-# --- Показ сохранённого плана ---
+# --- Сохранить план ---
+async def handle_save_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = int(update.message.from_user.id)
+    products = context.user_data.get("products", "")
+    days = int(context.user_data.get("days", "1"))
+    meals_per_day = int(context.user_data.get("meals_per_day", "3"))
+    plan_text = context.user_data.get("plan_text", "")
+
+    await create_meal_plan(user_id, products, days, meals_per_day, plan_text)
+
+    await update.message.reply_text(
+        "✅ План питания сохранён в базе данных.",
+        reply_markup=main_menu_keyboard()
+    )
+
+
+# --- Создать новый план (сразу пересоздание) ---
+async def handle_new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Введите продукты для нового плана:",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    return ASK_PRODUCTS
+
+
+# --- Показать сохранённый план ---
 async def show_saved_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = int(update.message.from_user.id)
     plan = await get_meal_plan(user_id)
 
     if plan:
         await update.message.reply_text(
-            f"📋 Ваш последний сохранённый план:\n\n{plan.plan_text}",
+            f"📋 Ваш сохранённый план питания:\n\n{plan.plan_text}",
             reply_markup=main_menu_keyboard()
         )
     else:
         await update.message.reply_text(
-            "❌ У вас ещё нет сохранённого плана.\n"
-            "Создайте новый, выбрав «🧠 Создать новый план».",
+            "❌ У вас пока нет сохранённого плана.",
             reply_markup=main_menu_keyboard()
         )
