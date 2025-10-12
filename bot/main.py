@@ -66,9 +66,12 @@ async def main():
     await app.run_polling()
 
 
-# --- Точка входа ---
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        import nest_asyncio
+        import asyncio
+
+        nest_asyncio.apply()  # ✅ Позволяет использовать уже запущенный event loop
+        asyncio.get_event_loop().run_until_complete(main())
     except (KeyboardInterrupt, SystemExit):
         print("🛑 Бот остановлен вручную.")
