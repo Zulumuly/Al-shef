@@ -2,8 +2,9 @@ import asyncio
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
+    CommandHandler,
     MessageHandler,
-    ConversationHandler,  
+    ConversationHandler,
     ContextTypes,
     filters,
 )
@@ -15,7 +16,7 @@ from logic.keyboards.command import handle_products, handle_days, handle_meals, 
 PRODUCTS, DAYS, MEALS = range(3)
 
 
-# Нижнее меню
+# ====== Нижнее меню ======
 def main_menu_keyboard():
     return ReplyKeyboardMarkup(
         [["Составить план питания", "Сохранённый план"]],
@@ -23,15 +24,16 @@ def main_menu_keyboard():
     )
 
 
-# Стартовое сообщение
+# ====== Команда /start ======
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Привет 👋 Я помогу тебе составить план питания.\nВыбери действие:",
+        "👋 Привет! Я помогу тебе составить персональный план питания.\n"
+        "Выбери действие ниже 👇",
         reply_markup=main_menu_keyboard()
     )
 
 
-# Обработка нажатия кнопок
+# ====== Обработка меню ======
 async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
@@ -48,18 +50,19 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
 
-# Основной диалог
+# ====== Диалоговая логика ======
 conv_handler = ConversationHandler(
-    entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu)],
+    entry_points=[MessageHandler(filters.Regex("^(Составить план питания|Сохранённый план)$"), handle_menu)],
     states={
         PRODUCTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_products)],
         DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_days)],
         MEALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_meals)],
     },
-    fallbacks=[],
+    fallbacks=[CommandHandler("start", start)],
 )
 
 
+# ====== Основной запуск ======
 async def main():
     print("🤖 Starting bot...")
     await init_db()
@@ -68,15 +71,12 @@ async def main():
     from config import BOT_TOKEN
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Добавляем только ConversationHandler
+    # Добавляем обработчики
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(conv_handler)
 
-    await app.initialize()
-    await app.start()
     print("🤖 Bot started successfully ✅")
-
-    await app.updater.start_polling()
-    await asyncio.Event().wait()
+    await app.run_polling()
 
 
 if __name__ == "__main__":
