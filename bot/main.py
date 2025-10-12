@@ -1,3 +1,4 @@
+import asyncio
 import warnings
 from telegram.ext import (
     ApplicationBuilder,
@@ -22,30 +23,33 @@ from logic.keyboards.command import (
 )
 from config import BOT_TOKEN
 from db.database import Base, engine
-import asyncio
 
-# 🔇 убираем лишние предупреждения
+
 warnings.filterwarnings("ignore", category=UserWarning, module="telegram")
 
 
 async def on_startup():
-    """Создаёт таблицы при старте"""
+    """Создать таблицы базы при старте"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("✅ Database initialized")
 
 
-def main():
-    print("🤖 Starting bot (polling mode)...")
+async def start_polling():
+    print("🤖 Starting bot (async polling)...")
 
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app = (
+        ApplicationBuilder()
+        .token(BOT_TOKEN)
+        .build()
+    )
 
-    # Основные команды
+    # Команды
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("plan", plan_start))
     app.add_handler(CommandHandler("saved", show_saved))
 
-    # Диалог составления плана
+    # Диалог
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("plan", plan_start)],
         states={
@@ -65,14 +69,22 @@ def main():
         fallbacks=[],
         per_message=False,
     )
-
     app.add_handler(conv_handler)
 
-    # Запуск
-    asyncio.run(on_startup())  # инициализация базы
+    await on_startup()
     print("🤖 Bot started successfully")
-    app.run_polling()
+
+    # Асинхронный polling
+    await app.run_polling(close_loop=False)
 
 
 if __name__ == "__main__":
-    main()
+    # создаём и запускаем event-loop вручную
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(start_polling())
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loop.close()
