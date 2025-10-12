@@ -68,6 +68,7 @@ def main():
             ],
         },
         fallbacks=[],
+        per_message=True,  # 👈 добавили эту строку
     )
 
     app.add_handler(conv_handler)
