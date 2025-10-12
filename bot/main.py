@@ -1,90 +1,74 @@
 import asyncio
-import nest_asyncio
-from telegram import Update, ReplyKeyboardMarkup
+import logging
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     ConversationHandler,
     ContextTypes,
     filters,
 )
+from config import BOT_TOKEN
 from db.database import init_db
-from logic.keyboards.command import handle_products, handle_days, handle_meals, show_saved_plan
+
+from logic.keyboards.command import (
+    start,
+    handle_start_plan,
+    handle_products,
+    handle_days,
+    handle_meals,
+    handle_save_plan,
+    handle_new_plan,
+    show_saved_plan,
+    ASK_PRODUCTS,
+    ASK_DAYS,
+    ASK_MEALS,
+)
+
+# --- Логирование ---
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 
-# Состояния диалога
-PRODUCTS, DAYS, MEALS = range(3)
-
-
-# ====== Нижнее меню ======
-def main_menu_keyboard():
-    return ReplyKeyboardMarkup(
-        [["Составить план питания", "Сохранённый план"]],
-        resize_keyboard=True
-    )
-
-
-# ====== Команда /start ======
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 Привет! Я помогу тебе составить персональный план питания.\n"
-        "Выбери действие ниже 👇",
-        reply_markup=main_menu_keyboard()
-    )
-
-
-# ====== Обработка меню ======
-async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-
-    if text == "Составить план питания":
-        await update.message.reply_text("Введите список продуктов (через запятую):")
-        return PRODUCTS
-
-    elif text == "Сохранённый план":
-        await show_saved_plan(update, context)
-        return ConversationHandler.END
-
-    else:
-        await update.message.reply_text("Пожалуйста, выберите действие с помощью кнопок ниже 👇")
-        return ConversationHandler.END
-
-
-# ====== Диалоговая логика ======
+# --- Основной диалоговый обработчик ---
 conv_handler = ConversationHandler(
-    entry_points=[MessageHandler(filters.Regex("^(Составить план питания|Сохранённый план)$"), handle_menu)],
+    entry_points=[CallbackQueryHandler(handle_start_plan, pattern="create_plan")],
     states={
-        PRODUCTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_products)],
-        DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_days)],
-        MEALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_meals)],
+        ASK_PRODUCTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_products)],
+        ASK_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_days)],
+        ASK_MEALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_meals)],
     },
-    fallbacks=[CommandHandler("start", start)],
+    fallbacks=[],
 )
 
 
-# ====== Основная функция ======
+# --- Основная функция запуска ---
 async def main():
-    print("🤖 Starting bot...")
+    print("🚀 Инициализация базы данных...")
     await init_db()
-    print("✅ Database initialized")
 
-    from config import BOT_TOKEN
+    print("🤖 Запуск Telegram-бота...")
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Добавляем обработчики
+    # 🔹 Регистрируем обработчики
     app.add_handler(CommandHandler("start", start))
     app.add_handler(conv_handler)
+    app.add_handler(CallbackQueryHandler(show_saved_plan, pattern="show_saved"))
+    app.add_handler(CallbackQueryHandler(handle_save_plan, pattern="save_plan"))
+    app.add_handler(CallbackQueryHandler(handle_new_plan, pattern="new_plan"))
 
-    print("🤖 Bot started successfully ✅")
+    print("✅ Бот успешно запущен и готов к работе!")
+
     await app.run_polling()
 
 
-# ====== Запуск (устойчивый для Render, локали, Docker) ======
+# --- Точка входа ---
 if __name__ == "__main__":
-    nest_asyncio.apply()
-    loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(main())
-    except KeyboardInterrupt:
-        print("🛑 Bot stopped manually")
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        print("🛑 Бот остановлен вручную.")
