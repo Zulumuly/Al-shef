@@ -3,6 +3,7 @@ from telegram.ext import ContextTypes, ConversationHandler, CallbackQueryHandler
 
 from db.crud import create_meal_plan, get_meal_plan
 from logic.llm.gigachat_api import ask_gigachat  
+from telegram import ReplyKeyboardMarkup
 
 
 # --- Состояния диалога ---
