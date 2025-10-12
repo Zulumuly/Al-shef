@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, ConversationHandler
 from logic.llm.meal_plan_generator import generate_meal_plan
-from db.crud import create_meal_plan, get_last_meal_plan  # ✅ исправлено
+from db.crud import create_meal_plan, get_meal_plan  # ✅ исправлено
 from config import GIGACHAT_TOKEN
 
 # 🔹 Состояния диалога
@@ -83,7 +83,7 @@ async def handle_plan_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if choice == "save_plan":
         try:
-            await create_meal_plan(  # ✅ исправлено
+            await create_meal_plan(  # ✅ сохранение в БД
                 user_id=user_id,
                 products=context.user_data.get("products"),
                 days=context.user_data.get("days"),
@@ -106,7 +106,7 @@ async def show_saved(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Вывести сохранённый план из БД"""
     user_id = str(update.message.from_user.id)
     try:
-        plan = await get_last_meal_plan(user_id)
+        plan = await get_meal_plan(user_id)  # ✅ исправлено имя функции
         if not plan:
             await update.message.reply_text(
                 "📂 У вас пока нет сохранённых планов.\n\n"
