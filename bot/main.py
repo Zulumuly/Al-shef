@@ -23,6 +23,9 @@ from logic.keyboards.command import (
 from config import BOT_TOKEN
 from db.database import Base, engine
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="telegram")
+
 
 # ————————————————————————————————————————————
 async def on_startup():
