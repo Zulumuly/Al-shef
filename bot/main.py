@@ -1,4 +1,4 @@
-import asyncio
+import warnings
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -22,12 +22,12 @@ from logic.keyboards.command import (
 )
 from config import BOT_TOKEN
 from db.database import Base, engine
+import asyncio
 
-import warnings
+# 🔇 убираем лишние предупреждения
 warnings.filterwarnings("ignore", category=UserWarning, module="telegram")
 
 
-# ————————————————————————————————————————————
 async def on_startup():
     """Создаёт таблицы при старте"""
     async with engine.begin() as conn:
@@ -35,18 +35,17 @@ async def on_startup():
     print("✅ Database initialized")
 
 
-# ————————————————————————————————————————————
-async def main():
-    print("🤖 Starting bot...")
+def main():
+    print("🤖 Starting bot (polling mode)...")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Команды
+    # Основные команды
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("plan", plan_start))
     app.add_handler(CommandHandler("saved", show_saved))
 
-    # Диалог
+    # Диалог составления плана
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("plan", plan_start)],
         states={
@@ -64,20 +63,16 @@ async def main():
             ],
         },
         fallbacks=[],
-        per_message=False,  # ✅ корректно
+        per_message=False,
     )
 
     app.add_handler(conv_handler)
 
-    # Запуск polling в рамках текущего event loop
-    await app.initialize()
-    await app.start()
+    # Запуск
+    asyncio.run(on_startup())  # инициализация базы
     print("🤖 Bot started successfully")
-    await app.updater.start_polling()
-    await app.updater.idle()
+    app.run_polling()
 
 
-# ————————————————————————————————————————————
 if __name__ == "__main__":
-    asyncio.run(on_startup())
-    asyncio.run(main())
+    main()
