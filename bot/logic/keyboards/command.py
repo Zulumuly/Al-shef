@@ -115,18 +115,13 @@ async def handle_plan_choice(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ————————————————————————————————————————————————————————
 async def show_saved(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает сохранённые планы питания из базы данных"""
-    # Универсально обрабатываем update от /saved или нажатия кнопки
     message = update.message or update.callback_query.message
-    user_id = (
-        update.message.from_user.id
-        if update.message
-        else update.callback_query.from_user.id
-    )
+    user_id = str(update.effective_user.id)  # 👈 всегда строка
 
     try:
         async with AsyncSessionLocal() as session:
             result = await session.execute(
-                MealPlan.__table__.select().where(MealPlan.user_id == str(user_id))
+                MealPlan.__table__.select().where(MealPlan.user_id == user_id)
             )
             plans = result.fetchall()
 
