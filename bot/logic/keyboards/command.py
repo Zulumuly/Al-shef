@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler, CallbackQueryHandler
 
 from db.crud import create_meal_plan, get_meal_plan
-from logic.gigachat_api import ask_gigachat   # ✅ исправленный импорт
+from logic.llm.gigachat_api import ask_gigachat  
 
 
 # --- Состояния диалога ---
