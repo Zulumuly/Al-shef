@@ -1,3 +1,4 @@
+import asyncio
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters, ConversationHandler
 )
@@ -7,20 +8,19 @@ from logic.keyboards.command import (
     start, handle_products, handle_days, handle_meals, show_saved_plan
 )
 
-# Состояния диалога
+# Состояния
 PRODUCTS, DAYS, MEALS = range(3)
 
 
-async def main():
-    print("🤖 Starting bot (Render-optimized)...")
+async def start_bot():
+    print("🤖 Starting bot (Render-stable)...")
 
-    # Инициализация базы данных
+    # ✅ Инициализация базы данных в том же event loop
     await init_db()
     print("✅ Database initialized")
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Диалоговое поведение
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -35,20 +35,26 @@ async def main():
     app.add_handler(CommandHandler("saved", show_saved_plan))
 
     print("🤖 Bot started successfully ✅")
-    await app.run_polling(close_loop=False)  # Render-safe
+    await app.run_polling(close_loop=False)
 
 
+# === Точка входа ===
 if __name__ == "__main__":
-    import asyncio
-
     try:
-        # Проверяем, есть ли уже запущенный event loop (Render)
+        # Проверяем, запущен ли event loop
         loop = asyncio.get_event_loop()
+
+        # Если Render уже запустил loop — просто создаём задачу внутри него
         if loop.is_running():
-            # Если Render уже запустил loop — запускаем задачу прямо в нём
-            loop.create_task(main())
+            print("⚙️ Event loop already running — scheduling bot inside existing loop.")
+            asyncio.ensure_future(start_bot())
         else:
-            loop.run_until_complete(main())
+            # Локальный запуск
+            loop.run_until_complete(start_bot())
+
     except RuntimeError:
-        # Резервный сценарий — если Render или Uvicorn блокирует цикл
-        asyncio.run(main())
+        # Резервный случай (если Render или другой рантайм странно себя ведёт)
+        print("⚙️ Fallback: creating a new asyncio loop manually.")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(start_bot())
