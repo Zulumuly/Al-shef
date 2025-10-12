@@ -1,68 +1,78 @@
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
-from db.crud import create_meal_plan, get_meal_plan
 from logic.llm.meal_plan_generator import generate_meal_plan
+from db.database import AsyncSessionLocal
+from db.models import MealPlan
 
-WAITING_PRODUCTS, WAITING_DAYS, WAITING_MEALS = range(3)
+WAITING_PRODUCTS, WAITING_DAYS, WAITING_MEALS, CONFIRM_PLAN = range(4)
 
-# Шаг 1: начало — запросить продукты
+# ——————————————————————————————————————————————
 async def plan_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Введите список доступных продуктов через запятую:")
+    await update.message.reply_text("Введите список доступных продуктов (через запятую):")
     return WAITING_PRODUCTS
 
-# Шаг 2: получить продукты
-async def process_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if not text:
-        await update.message.reply_text("Пожалуйста, введите продукты, например: курица, рис, овощи")
-        return WAITING_PRODUCTS
 
-    context.user_data["products"] = [p.strip() for p in text.split(",") if p.strip()]
-    await update.message.reply_text("На сколько дней вы хотите составить план?")
+async def process_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["products"] = update.message.text
+    await update.message.reply_text("На сколько дней составить план?")
     return WAITING_DAYS
 
-# Шаг 3: дни
-async def process_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        days = int(update.message.text)
-        context.user_data["days"] = days
-    except ValueError:
-        await update.message.reply_text("Введите число, например 3:")
-        return WAITING_DAYS
 
+async def process_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["days"] = int(update.message.text)
     await update.message.reply_text("Сколько приёмов пищи в день?")
     return WAITING_MEALS
 
-# Шаг 4: приёмы пищи
+
 async def process_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["meals"] = int(update.message.text)
+
+    products = context.user_data["products"]
+    days = context.user_data["days"]
+    meals = context.user_data["meals"]
+
+    await update.message.reply_text("⏳ Формирую план питания, подождите немного...")
+
     try:
-        meals = int(update.message.text)
-    except ValueError:
-        await update.message.reply_text("Введите число, например 4:")
-        return WAITING_MEALS
+        plan_text = generate_meal_plan(products, days, meals)
+        context.user_data["plan_text"] = plan_text
 
-    products = context.user_data.get("products", [])
-    days = context.user_data.get("days")
+        # Кнопки "Сохранить" / "Пересоздать"
+        keyboard = [
+            [
+                InlineKeyboardButton("💾 Сохранить план", callback_data="save_plan"),
+                InlineKeyboardButton("🔁 Пересоздать", callback_data="regen_plan"),
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text("⏳ Генерирую план питания...")
+        await update.message.reply_text(f"✅ Ваш план питания:\n\n{plan_text}", reply_markup=reply_markup)
+        return CONFIRM_PLAN
 
-    plan_text = generate_meal_plan(products, days, meals)
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка при составлении плана: {e}")
+        return ConversationHandler.END
 
-    await create_meal_plan(
-        user_id=str(update.effective_user.id),
-        products=products,
-        days=days,
-        meals=meals,
-        plan_text=plan_text
-    )
 
-    await update.message.reply_text(f"✅ Ваш план питания:\n\n{plan_text}")
-    return ConversationHandler.END
+# ——————————————————————————————————————————————
+async def handle_plan_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка кнопок 'Сохранить' и 'Пересоздать'"""
+    query = update.callback_query
+    await query.answer()
 
-# Показать сохранённый план
-async def show_saved(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    plan = await get_meal_plan(str(update.effective_user.id))
-    if not plan:
-        await update.message.reply_text("❌ У вас нет сохранённого плана.")
-    else:
-        await update.message.reply_text(f"📋 Ваш сохранённый план:\n\n{plan.plan_text}")
+    user_id = query.from_user.id
+    choice = query.data
+    plan_text = context.user_data.get("plan_text")
+
+    if choice == "save_plan":
+        async with AsyncSessionLocal() as session:
+            plan = MealPlan(user_id=user_id, plan_text=plan_text)
+            session.add(plan)
+            await session.commit()
+
+        await query.edit_message_text("✅ План питания сохранён в базе данных.")
+        return ConversationHandler.END
+
+    elif choice == "regen_plan":
+        await query.edit_message_text("🔁 Хорошо, давайте пересоздадим план. Введите список продуктов заново:")
+        return WAITING_PRODUCTS
