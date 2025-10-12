@@ -1,29 +1,33 @@
-from typing import AsyncGenerator
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+import os
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
-from config import DATABASE_URL
+from typing import AsyncGenerator
 
-# Базовая модель
+# URL базы из переменной окружения
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Базовый класс для моделей
 Base = declarative_base()
 
 # Асинхронный движок SQLAlchemy
 engine = create_async_engine(DATABASE_URL, echo=False, future=True)
 
-# Фабрика сессий
+# Асинхронная фабрика сессий
 AsyncSessionLocal = sessionmaker(
     bind=engine,
     class_=AsyncSession,
     expire_on_commit=False
 )
 
-# Асинхронная инициализация базы данных
-async def init_db() -> None:
-    """Создаёт все таблицы в базе данных (если их нет)."""
+
+# ✅ Создание таблиц при старте
+async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    print("✅ Database initialized (tables checked/created)")
 
-# Асинхронный генератор для получения сессии
+
+# ✅ Асинхронный генератор сессий (типобезопасный, без ошибок Pylance)
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """Возвращает асинхронную сессию SQLAlchemy."""
     async with AsyncSessionLocal() as session:
         yield session
