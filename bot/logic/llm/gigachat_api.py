@@ -1,5 +1,5 @@
 import requests
-from bot.config import GIGACHAT_TOKEN
+from config import GIGACHAT_TOKEN
 
 def ask_gigachat(prompt: str) -> str:
     headers = {

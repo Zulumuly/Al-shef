@@ -1,8 +1,8 @@
 from telegram import Update
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, filters
-from bot.db.database import SessionLocal
-from bot.db.models import MealPlan
-from bot.logic.llm.meal_plan_generator import generate_meal_plan
+from db.database import SessionLocal
+from db.models import MealPlan
+from logic.llm.meal_plan_generator import generate_meal_plan
 
 # --- FSM состояния ---
 WAITING_PRODUCTS, WAITING_DAYS, WAITING_MEALS = range(3)

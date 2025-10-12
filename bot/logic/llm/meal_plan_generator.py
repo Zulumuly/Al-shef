@@ -1,4 +1,4 @@
-from bot.logic.llm.gigachat_api import ask_gigachat
+from logic.llm.gigachat_api import ask_gigachat
 
 def generate_meal_plan(products: list[str], days: int, meals_per_day: int) -> str:
     prompt = f"""

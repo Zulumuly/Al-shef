@@ -1,9 +1,9 @@
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, ConversationHandler, filters
-)
-from bot.config import BOT_TOKEN
-from bot.logic.keyboards.start_button import start
-from bot.logic.keyboards.commands import (
+# bot/main.py
+
+from config import BOT_TOKEN
+from db.database import Base, engine
+from logic.keyboards.start_button import start
+from logic.keyboards.command import (
     plan_start, process_products, process_days, process_meals,
     handle_text_buttons, show_saved,
     WAITING_PRODUCTS, WAITING_DAYS, WAITING_MEALS
