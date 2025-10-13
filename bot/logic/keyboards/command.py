@@ -7,7 +7,6 @@ from logic.llm.gigachat_api import ask_gigachat
 from telegram import ReplyKeyboardMarkup
 
 
-# --- Состояния диалога ---
 ASK_PRODUCTS, ASK_DAYS, ASK_MEALS = range(3)
 
 # --- Главное меню ---
@@ -35,7 +34,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# --- Начало создания нового плана ---
 async def new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Введите продукты, которые вы хотите включить в рацион (через запятую):",
