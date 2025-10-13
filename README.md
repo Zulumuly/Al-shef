@@ -5,15 +5,15 @@
 
 ## Используемые технологии
 
-- Python 3.10+
-- aiogram — для взаимодействия с Telegram API
-- Gigachat API — для поиска и генерации рецептов
-- PostgreSQL / SQLite — для хранения пользовательских данных и рецептов
-- SQLAlchemy — ORM для работы с БД
-- 
+- Python 3.12+ 
+- python-telegram-bot v20+ — для взаимодействия с Telegram API
+- GigaChat API — LLM
+- PostgreSQL — для хранения данных
+- SQLAlchemy, asyncpg — ORM для асинхронной работы с базой данных
+- Render — деплой и хостинг
+
 - Postman — тестирование API
-- Chrome DevTools — анализ сетевых запросов
-- Pytest / Unittest — тестирование логики бота
+
 
 Перед разработкой были определены пользовательские сценарии (User Story), вариант использования (Use Case).
 Подготовлены макет интерфейса.
