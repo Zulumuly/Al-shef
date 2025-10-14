@@ -1,43 +1,40 @@
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
-
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+)
 from telegram.ext import ContextTypes, ConversationHandler
 
 from db.crud import create_meal_plan, get_meal_plan
-from logic.llm.gigachat_api import ask_gigachat  
-from telegram import ReplyKeyboardMarkup
+from logic.llm.gigachat_api import ask_gigachat
 
 
 ASK_PRODUCTS, ASK_DAYS, ASK_MEALS = range(3)
 
-# --- Главное меню ---
+# --- Главное меню (слева) ---
 def main_menu_keyboard():
     keyboard = [
-        ["🧠 Создать новый план"],
-        ["📋 Показать сохранённый план"]
-    ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-# --- Кнопки после генерации плана ---
-def after_plan_keyboard():
-    keyboard = [
-        ["✅ Сохранить план", "🔁 Создать новый план"]
+        ["🧠 Plan", "📋 Saved"]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
-# --- Старт / Главное меню ---
+# --- Старт ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Привет! 👋 Я помогу тебе составить персональный план питания.\n\n"
-        "Выбери действие ниже 👇",
-        reply_markup=main_menu_keyboard()
+        "Привет! 👋 Я AI-Shef — помогу тебе составить персональный план питания.\n\n"
+        "Выбери действие слева 👇",
+        reply_markup=main_menu_keyboard(),
     )
 
 
+# --- Новый план ---
 async def new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Введите продукты, которые вы хотите включить в рацион (через запятую):",
-        reply_markup=ReplyKeyboardRemove()
+        reply_markup=ReplyKeyboardRemove(),
     )
     return ASK_PRODUCTS
 
@@ -61,7 +58,8 @@ async def handle_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = int(update.message.from_user.id)
     products = context.user_data.get("products")
     days = context.user_data.get("days")
-    meals_per_day = context.user_data.get("meals_per_day", update.message.text)
+    meals_per_day = update.message.text
+    context.user_data["meals_per_day"] = meals_per_day
 
     await update.message.reply_text("Формирую план питания, подождите немного...")
 
@@ -72,14 +70,20 @@ async def handle_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     plan_text = ask_gigachat(prompt)
-
-    # сохраняем текст во временные данные пользователя
     context.user_data["plan_text"] = plan_text
+
+    # --- Inline-кнопки после генерации плана ---
+    keyboard = [
+        [
+            InlineKeyboardButton("💾 Сохранить план", callback_data="save_plan"),
+            InlineKeyboardButton("🔄 Создать новый", callback_data="new_plan"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(plan_text)
     await update.message.reply_text(
-        "Что вы хотите сделать дальше?",
-        reply_markup=after_plan_keyboard()
+        "Что вы хотите сделать дальше?", reply_markup=reply_markup
     )
 
     return ConversationHandler.END
@@ -87,7 +91,10 @@ async def handle_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- Сохранить план ---
 async def handle_save_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = int(update.message.from_user.id)
+    query = update.callback_query
+    await query.answer()
+
+    user_id = int(query.from_user.id)
     products = context.user_data.get("products", "")
     days = int(context.user_data.get("days", "1"))
     meals_per_day = int(context.user_data.get("meals_per_day", "3"))
@@ -95,17 +102,17 @@ async def handle_save_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await create_meal_plan(user_id, products, days, meals_per_day, plan_text)
 
-    await update.message.reply_text(
-        "✅ План питания сохранён в базе данных.",
-        reply_markup=main_menu_keyboard()
-    )
+    await query.edit_message_text("✅ План питания сохранён в базе данных.")
+    await query.message.reply_text("Вы можете выбрать следующее действие:", reply_markup=main_menu_keyboard())
 
 
-# --- Создать новый план (сразу пересоздание) ---
+# --- Создать новый план (пересоздание) ---
 async def handle_new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Введите продукты для нового плана:",
-        reply_markup=ReplyKeyboardRemove()
+    query = update.callback_query
+    await query.answer()
+
+    await query.edit_message_text(
+        "Введите продукты для нового плана:", reply_markup=None
     )
     return ASK_PRODUCTS
 
@@ -118,10 +125,10 @@ async def show_saved_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if plan:
         await update.message.reply_text(
             f"📋 Ваш сохранённый план питания:\n\n{plan.plan_text}",
-            reply_markup=main_menu_keyboard()
+            reply_markup=main_menu_keyboard(),
         )
     else:
         await update.message.reply_text(
             "❌ У вас пока нет сохранённого плана.",
-            reply_markup=main_menu_keyboard()
+            reply_markup=main_menu_keyboard(),
         )
