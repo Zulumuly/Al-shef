@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import nest_asyncio
+from telegram import BotCommand
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -9,6 +10,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
 )
+
 from config import BOT_TOKEN
 from db.database import init_db
 from logic.keyboards.command import (
@@ -42,9 +44,9 @@ async def main():
     print("🤖 Запуск Telegram-бота...")
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # --- Обработчик создания плана ---
+    # --- Основной ConversationHandler ---
     conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex("^🧠 Plan$"), new_plan)],
+        entry_points=[CommandHandler("plan", new_plan)],
         states={
             ASK_PRODUCTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_products)],
             ASK_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_days)],
@@ -54,10 +56,17 @@ async def main():
         per_message=False,
     )
 
-    # --- Регистрация всех обработчиков ---
+    # --- Регистрируем команды (для бокового меню Telegram) ---
+    await app.bot.set_my_commands([
+        BotCommand("start", "🔹 Запуск бота"),
+        BotCommand("plan", "🧠 Создать новый план"),
+        BotCommand("saved", "📋 Показать сохранённый план"),
+    ])
+
+    # --- Обработчики ---
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("saved", show_saved_plan))
     app.add_handler(conv_handler)
-    app.add_handler(MessageHandler(filters.Regex("^📋 Saved$"), show_saved_plan))
     app.add_handler(CallbackQueryHandler(handle_save_plan, pattern="save_plan"))
     app.add_handler(CallbackQueryHandler(handle_new_plan, pattern="new_plan"))
 
