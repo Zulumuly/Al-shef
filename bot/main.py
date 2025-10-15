@@ -58,19 +58,20 @@ async def main():
 
     # --- Регистрируем команды (для бокового меню Telegram) ---
     await app.bot.set_my_commands([
-        BotCommand("start", "🔹 Запуск бота"),
-        BotCommand("plan", "🧠 Создать новый план"),
-        BotCommand("saved", "📋 Показать сохранённый план"),
+        BotCommand("start", "Запуск бота"),
+        BotCommand("plan", "Создать новый план"),
+        BotCommand("saved", "Показать сохранённый план"),
     ])
 
     # --- Обработчики ---
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("saved", show_saved_plan))
+    app.add_handler(CommandHandler("plan", new_plan))
     app.add_handler(conv_handler)
     app.add_handler(CallbackQueryHandler(handle_save_plan, pattern="save_plan"))
     app.add_handler(CallbackQueryHandler(handle_new_plan, pattern="new_plan"))
 
-    print("✅ Бот успешно запущен и готов к работе!")
+    print("Бот успешно запущен и готов к работе!")
     await app.run_polling()
 
 
@@ -78,4 +79,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        print("🛑 Бот остановлен вручную.")
+        print("Бот остановлен вручную.")
