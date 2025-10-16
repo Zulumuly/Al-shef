@@ -1,12 +1,11 @@
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update, ReplyKeyboardRemove
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, Update
+from telegram.ext import ContextTypes
 from db.crud import create_meal_plan, get_meal_plan
 from logic.llm.gigachat_api import ask_gigachat
 
 ASK_PRODUCTS, ASK_DAYS, ASK_MEALS = range(3)
 
 
-# Главное меню 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Привет! Я помогу тебе составить персональный план питания.\n\n"
@@ -24,27 +23,25 @@ async def new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASK_PRODUCTS
 
 
-#  Шаг 1
 async def handle_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["products"] = update.message.text
+    context.user_data["products"] = update.message.text.strip()
     await update.message.reply_text("На сколько дней нужен план?")
     return ASK_DAYS
 
 
-# Шаг 2
 async def handle_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["days"] = update.message.text
+    context.user_data["days"] = update.message.text.strip()
     await update.message.reply_text("Сколько приёмов пищи в день?")
     return ASK_MEALS
 
 
-# Шаг 3
 async def handle_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = int(update.message.from_user.id)
     products = context.user_data.get("products")
-    days = update.message.text if context.user_data.get("days") is None else context.user_data["days"]
-    meals_per_day = update.message.text
+    days = context.user_data.get("days")
+    meals_per_day = update.message.text.strip()
 
+    context.user_data["meals_per_day"] = meals_per_day
     await update.message.reply_text("Формирую план питания, подождите немного...")
 
     prompt = (
@@ -54,18 +51,12 @@ async def handle_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     plan_text = ask_gigachat(prompt)
-
-    context.user_data.update({
-        "plan_text": plan_text,
-        "days": days,
-        "meals_per_day": meals_per_day,
-        "products": products,
-    })
+    context.user_data["plan_text"] = plan_text
 
     buttons = [
         [
-            InlineKeyboardButton("💾 Сохранить план", callback_data="save_plan"),
-            InlineKeyboardButton("🔄 Создать новый", callback_data="new_plan"),
+            InlineKeyboardButton("Сохранить план", callback_data="save_plan"),
+            InlineKeyboardButton("Создать новый", callback_data="new_plan"),
         ]
     ]
 
@@ -75,7 +66,7 @@ async def handle_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(buttons)
     )
 
-    return ConversationHandler.END
+    return ASK_MEALS
 
 
 async def handle_save_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -93,7 +84,7 @@ async def handle_save_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await create_meal_plan(user_id, products, days, meals_per_day, plan_text)
-    await query.edit_message_text("План питания сохранён! Чтобы посмотреть, открой меню → Saved.")
+    await query.edit_message_text("План питания сохранён. Чтобы просмотреть, используй /saved.")
 
 
 async def handle_new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -112,8 +103,6 @@ async def show_saved_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     plan = await get_meal_plan(user_id)
 
     if plan:
-        await update.message.reply_text(
-            f"Ваш сохранённый план питания:\n\n{plan.plan_text}"
-        )
+        await update.message.reply_text(f"Ваш сохранённый план питания:\n\n{plan.plan_text}")
     else:
         await update.message.reply_text("У вас пока нет сохранённого плана.")
