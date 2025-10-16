@@ -6,17 +6,16 @@ from logic.llm.gigachat_api import ask_gigachat
 ASK_PRODUCTS, ASK_DAYS, ASK_MEALS = range(3)
 
 
-# --- Главное меню (только при /start) ---
+# Главное меню 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Привет! 👋 Я помогу тебе составить персональный план питания.\n\n"
+        "Привет! Я помогу тебе составить персональный план питания.\n\n"
         "Используй меню слева:\n"
-        "🧠 /plan — создать новый план\n"
-        "📋 /saved — посмотреть сохранённые планы."
+        "/plan — создать новый план\n"
+        "/saved — посмотреть сохранённые планы."
     )
 
 
-# --- Новый план ---
 async def new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Введите продукты, которые вы хотите включить в рацион (через запятую):",
@@ -25,21 +24,21 @@ async def new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASK_PRODUCTS
 
 
-# --- Шаг 1: продукты ---
+#  Шаг 1
 async def handle_products(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["products"] = update.message.text
     await update.message.reply_text("На сколько дней нужен план?")
     return ASK_DAYS
 
 
-# --- Шаг 2: дни ---
+# Шаг 2
 async def handle_days(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["days"] = update.message.text
     await update.message.reply_text("Сколько приёмов пищи в день?")
     return ASK_MEALS
 
 
-# --- Шаг 3: приёмы пищи ---
+# Шаг 3
 async def handle_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = int(update.message.from_user.id)
     products = context.user_data.get("products")
@@ -56,7 +55,6 @@ async def handle_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     plan_text = ask_gigachat(prompt)
 
-    # ✅ Сохраняем всё в context.user_data, чтобы inline-кнопки имели доступ
     context.user_data.update({
         "plan_text": plan_text,
         "days": days,
@@ -80,7 +78,6 @@ async def handle_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-# --- Сохранение плана ---
 async def handle_save_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -92,14 +89,13 @@ async def handle_save_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     plan_text = context.user_data.get("plan_text", "")
 
     if not plan_text:
-        await query.edit_message_text("❌ Ошибка: нет данных для сохранения.")
+        await query.edit_message_text("Ошибка: нет данных для сохранения.")
         return
 
     await create_meal_plan(user_id, products, days, meals_per_day, plan_text)
-    await query.edit_message_text("✅ План питания сохранён! Чтобы посмотреть, открой меню → 📋 Saved.")
+    await query.edit_message_text("План питания сохранён! Чтобы посмотреть, открой меню → Saved.")
 
 
-# --- Пересоздание плана ---
 async def handle_new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -111,14 +107,13 @@ async def handle_new_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ASK_PRODUCTS
 
 
-# --- Просмотр сохранённого плана ---
 async def show_saved_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = int(update.message.from_user.id)
     plan = await get_meal_plan(user_id)
 
     if plan:
         await update.message.reply_text(
-            f"📋 Ваш сохранённый план питания:\n\n{plan.plan_text}"
+            f"Ваш сохранённый план питания:\n\n{plan.plan_text}"
         )
     else:
-        await update.message.reply_text("❌ У вас пока нет сохранённого плана.")
+        await update.message.reply_text("У вас пока нет сохранённого плана.")

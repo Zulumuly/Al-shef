@@ -5,7 +5,7 @@ class MealPlan(Base):
     __tablename__ = "meal_plans"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, index=True)  # 👈 раньше было String
+    user_id = Column(Integer, index=True)  
     products = Column(String)
     days = Column(Integer)
     meals_per_day = Column(Integer)

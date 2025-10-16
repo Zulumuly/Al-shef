@@ -1,15 +1,15 @@
 import asyncio
 import logging
 import nest_asyncio
-from telegram import BotCommand
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
-    ConversationHandler,
     CallbackQueryHandler,
+    ConversationHandler,
     filters,
 )
+from telegram import BotCommand
 
 from config import BOT_TOKEN
 from db.database import init_db
@@ -27,7 +27,6 @@ from logic.keyboards.command import (
     ASK_MEALS,
 )
 
-# --- Логирование ---
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
@@ -37,39 +36,37 @@ nest_asyncio.apply()
 
 
 async def main():
-    print("🚀 Инициализация базы данных...")
+    print("Инициализация базы данных...")
     await init_db()
-    print("✅ Database initialized (tables checked/created)")
+    print("Database initialized")
 
-    print("🤖 Запуск Telegram-бота...")
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # --- Основной ConversationHandler ---
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("plan", new_plan)],
+        entry_points=[
+            CommandHandler("plan", new_plan),
+        ],
         states={
             ASK_PRODUCTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_products)],
             ASK_DAYS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_days)],
             ASK_MEALS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_meals)],
         },
         fallbacks=[],
-        per_message=False,
     )
 
-    # --- Регистрируем команды (для бокового меню Telegram) ---
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("saved", show_saved_plan))
+    app.add_handler(conv_handler)
+    app.add_handler(CallbackQueryHandler(handle_save_plan, pattern="^save_plan$"))
+    app.add_handler(CallbackQueryHandler(handle_new_plan, pattern="^new_plan$"))
+
+
     await app.bot.set_my_commands([
         BotCommand("start", "Запуск бота"),
         BotCommand("plan", "Создать новый план"),
         BotCommand("saved", "Показать сохранённый план"),
     ])
-
-    # --- Обработчики ---
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("saved", show_saved_plan))
-    app.add_handler(CommandHandler("plan", new_plan))
-    app.add_handler(conv_handler)
-    app.add_handler(CallbackQueryHandler(handle_save_plan, pattern="save_plan"))
-    app.add_handler(CallbackQueryHandler(handle_new_plan, pattern="new_plan"))
 
     print("Бот успешно запущен и готов к работе!")
     await app.run_polling()

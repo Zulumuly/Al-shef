@@ -8,7 +8,7 @@ REQUIRED_VARS = ["BOT_TOKEN", "DATABASE_URL", "GIGACHAT_CLIENT_ID", "GIGACHAT_CL
 
 missing = [v for v in REQUIRED_VARS if not os.getenv(v)]
 if missing:
-    raise EnvironmentError(f"❌ Не найдены переменные окружения: {', '.join(missing)}")
+    raise EnvironmentError(f"Не найдены переменные окружения: {', '.join(missing)}")
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")

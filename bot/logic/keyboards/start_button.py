@@ -7,6 +7,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"{WELCOME_TEXT}\n\n"
         "Доступные команды:\n"
-        "🍽️ /plan — составить план питания\n"
-        "📂 /saved — сохранённый план питания"
+        "/plan — составить план питания\n"
+        "/saved — сохранённый план питания"
     )

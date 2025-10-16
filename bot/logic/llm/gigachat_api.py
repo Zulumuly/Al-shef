@@ -2,21 +2,17 @@ import requests
 import os
 import base64
 
-# Получаем переменные окружения
 CLIENT_ID = os.getenv("GIGACHAT_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GIGACHAT_CLIENT_SECRET")
 
-# URL'ы GigaChat
 TOKEN_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
 CHAT_URL = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
 
 
 def get_access_token():
-    """Запрашивает access_token у GigaChat"""
     if not CLIENT_ID or not CLIENT_SECRET:
-        raise Exception("❌ Отсутствуют GIGACHAT_CLIENT_ID или GIGACHAT_CLIENT_SECRET в переменных окружения")
+        raise Exception("Отсутствуют GIGACHAT_CLIENT_ID или GIGACHAT_CLIENT_SECRET в переменных окружения")
 
-    # Формируем Base64 строку (а не URL-кодирование!)
     auth_string = f"{CLIENT_ID}:{CLIENT_SECRET}"
     auth_bytes = auth_string.encode("utf-8")
     auth_base64 = base64.b64encode(auth_bytes).decode("utf-8")
@@ -31,16 +27,16 @@ def get_access_token():
     response = requests.post(TOKEN_URL, headers=headers, data=data, verify=False)
 
     if response.status_code != 200:
-        print(f"❌ Ошибка получения токена: {response.status_code}, {response.text}")
+        print(f"Ошибка получения токена: {response.status_code}, {response.text}")
         raise Exception(f"Ошибка получения токена: {response.status_code}, {response.text}")
 
     token_data = response.json()
     access_token = token_data.get("access_token")
 
     if not access_token:
-        raise Exception(f"❌ Не удалось получить access_token. Ответ: {token_data}")
+        raise Exception(f"Не удалось получить access_token. Ответ: {token_data}")
 
-    print("✅ Токен успешно получен")
+    print("Токен успешно получен")
     return access_token
 
 
@@ -66,11 +62,11 @@ def ask_gigachat(prompt: str) -> str:
         data = response.json()
         answer = data["choices"][0]["message"]["content"]
 
-        print("✅ Ответ от GigaChat получен успешно")
+        print("Ответ от GigaChat получен успешно")
         return answer
 
     except Exception as e:
-        print(f"❌ Ошибка при обращении к GigaChat: {e}")
+        print(f"Ошибка при обращении к GigaChat: {e}")
         if "response" in locals():
-            print("📩 Ответ сервера:", response.text)
-        return "Ошибка при обращении к GigaChat 😞"
+            print("Ответ сервера:", response.text)
+        return "Ошибка при обращении к GigaChat"
