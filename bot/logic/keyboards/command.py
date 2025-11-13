@@ -106,3 +106,4 @@ async def show_saved_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Ваш сохранённый план питания:\n\n{plan.plan_text}")
     else:
         await update.message.reply_text("У вас пока нет сохранённого плана.")
+
